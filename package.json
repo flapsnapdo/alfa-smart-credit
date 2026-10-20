@@ -9,5 +9,5 @@
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build"
   },
-  "packageManager": "pnpm@12.14.0"
+  "packageManager": "pnpm@10.34.7"
 }
