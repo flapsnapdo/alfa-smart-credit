@@ -1,16 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/client/LoginPage';
+import { ProductSelectPage } from './pages/client/ProductSelectPage';
 
 export default function App() {
   return (
     <Routes>
-      {/* Главная страница → редирект на вход */}
       <Route path="/" element={<Navigate to="/login" replace />} />
-      
-      {/* Экран входа */}
       <Route path="/login" element={<LoginPage />} />
-      
-      {/* Заглушки для кабинетов (пока в разработке) */}
+      <Route path="/client/product-select" element={<ProductSelectPage />} />
       <Route 
         path="/client/dashboard" 
         element={

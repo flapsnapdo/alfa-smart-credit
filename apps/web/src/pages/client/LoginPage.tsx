@@ -33,7 +33,7 @@ export function LoginPage() {
       if (role === 'analyst') {
         navigate('/analyst/dashboard');
       } else {
-        navigate('/client/dashboard');
+        navigate('/client/product-select');
       }
     }, 500);
   };
