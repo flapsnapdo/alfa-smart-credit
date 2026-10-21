@@ -56,3 +56,21 @@ export interface ScoringResult {
   stopFactors: StopFactor[];
   rulesVersion: string;
 }
+export interface Offer {
+  productCode: ProductCode;
+  amount: number;
+  term: number;
+  rate: number;
+  monthlyPayment: number;
+}
+
+export type DecisionType = 'APPROVE' | 'COUNTER_OFFER' | 'MANUAL_REVIEW' | 'REJECT';
+
+export interface CreditDecision {
+  type: DecisionType;
+  rate: number | null;
+  maxAvailableAmount: number;
+  offer: Offer | null;          // основное предложение
+  alternatives: Offer[];        // другие варианты контрпредложения
+  reasons: string[];            // причины простыми словами
+}
