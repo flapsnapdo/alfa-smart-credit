@@ -1,0 +1,260 @@
+{
+  "_comment": "Синтетические данные. Суммы в копейках. Используются mock-external (registry/tax/bki) и seed API (companies/financials).",
+  "companies": [
+    {
+      "key": "severny",
+      "inn": "7701526010",
+      "ogrn": "1207700787788",
+      "type": "LLC",
+      "name": "ООО «Северный склад»",
+      "status": "ACTIVE",
+      "registeredAt": "2020-09-10",
+      "okved": "46.73",
+      "okvedName": "Оптовая торговля лесо- и стройматериалами",
+      "address": "г. Москва, ул. Складская, д. 12",
+      "directorName": "Игорь Петрович Волков",
+      "owner": "igor@demo.ru",
+      "position": "CEO",
+      "fin": {
+        "avgMonthlyRevenue": 400000000,
+        "revenueLast6m": 2520000000,
+        "revenuePrev6m": 2250000000,
+        "existingMonthlyPayments": 10000000
+      },
+      "tax": {
+        "hasTaxDebt": false,
+        "employees": 25,
+        "taxRegime": "ОСН"
+      },
+      "bki": {
+        "activeLoans": [
+          {
+            "bank": "Банк А",
+            "amount": 300000000,
+            "monthlyPayment": 10000000
+          }
+        ],
+        "closedLoans": 3,
+        "maxDelinquencyDays12m": 0,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 1
+      }
+    },
+    {
+      "key": "smirnova",
+      "inn": "771281590887",
+      "ogrn": "322779328792172",
+      "type": "IE",
+      "name": "ИП Смирнова Анна Сергеевна",
+      "status": "ACTIVE",
+      "registeredAt": "2022-09-20",
+      "okved": "56.10",
+      "okvedName": "Деятельность ресторанов и кафе",
+      "address": "г. Москва, Кофейный пер., д. 3",
+      "directorName": "Анна Сергеевна Смирнова",
+      "owner": "anna@demo.ru",
+      "position": "OWNER",
+      "fin": {
+        "avgMonthlyRevenue": 150000000,
+        "revenueLast6m": 900000000,
+        "revenuePrev6m": 890000000,
+        "existingMonthlyPayments": 0
+      },
+      "tax": {
+        "hasTaxDebt": false,
+        "employees": 4,
+        "taxRegime": "УСН"
+      },
+      "bki": {
+        "activeLoans": [],
+        "closedLoans": 1,
+        "maxDelinquencyDays12m": 0,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 0
+      }
+    },
+    {
+      "key": "khlebny",
+      "inn": "7701301665",
+      "ogrn": "1217700421806",
+      "type": "LLC",
+      "name": "ООО «Хлебный дом»",
+      "status": "ACTIVE",
+      "registeredAt": "2021-08-01",
+      "okved": "10.71",
+      "okvedName": "Производство хлеба и хлебобулочных изделий",
+      "address": "г. Москва, ул. Пекарей, д. 7",
+      "directorName": "Ольга Викторовна Белова",
+      "owner": "olga@demo.ru",
+      "position": "ACCOUNTANT",
+      "fin": {
+        "avgMonthlyRevenue": 80000000,
+        "revenueLast6m": 509999999,
+        "revenuePrev6m": 440000000,
+        "existingMonthlyPayments": 16000000
+      },
+      "tax": {
+        "hasTaxDebt": false,
+        "employees": 12,
+        "taxRegime": "УСН"
+      },
+      "bki": {
+        "activeLoans": [
+          {
+            "bank": "Банк Б",
+            "amount": 400000000,
+            "monthlyPayment": 16000000
+          }
+        ],
+        "closedLoans": 2,
+        "maxDelinquencyDays12m": 0,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 1
+      }
+    },
+    {
+      "key": "stroymaster",
+      "inn": "7701131861",
+      "ogrn": "1247700967920",
+      "type": "LLC",
+      "name": "ООО «СтройМастер»",
+      "status": "ACTIVE",
+      "registeredAt": "2024-09-01",
+      "okved": "41.20",
+      "okvedName": "Строительство жилых и нежилых зданий",
+      "address": "г. Москва, Строительный пр., д. 21",
+      "directorName": "Сергей Иванович Котов",
+      "owner": "olga@demo.ru",
+      "position": "ACCOUNTANT",
+      "fin": {
+        "avgMonthlyRevenue": 200000000,
+        "revenueLast6m": 1100000000,
+        "revenuePrev6m": 1300000000,
+        "existingMonthlyPayments": 5000000
+      },
+      "tax": {
+        "hasTaxDebt": false,
+        "employees": 18,
+        "taxRegime": "ОСН"
+      },
+      "bki": {
+        "activeLoans": [
+          {
+            "bank": "Банк В",
+            "amount": 100000000,
+            "monthlyPayment": 5000000
+          }
+        ],
+        "closedLoans": 0,
+        "maxDelinquencyDays12m": 20,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 2
+      }
+    },
+    {
+      "key": "agrotech",
+      "inn": "7701091390",
+      "ogrn": "1167700908100",
+      "type": "LLC",
+      "name": "ООО «Агротех»",
+      "status": "ACTIVE",
+      "registeredAt": "2016-05-12",
+      "okved": "01.11",
+      "okvedName": "Выращивание зерновых культур",
+      "address": "Московская обл., с. Полевое, ул. Центральная, д. 1",
+      "directorName": "Дмитрий Андреевич Зайцев",
+      "owner": "olga@demo.ru",
+      "position": "ACCOUNTANT",
+      "fin": {
+        "avgMonthlyRevenue": 300000000,
+        "revenueLast6m": 1900000000,
+        "revenuePrev6m": 1700000000,
+        "existingMonthlyPayments": 20000000
+      },
+      "tax": {
+        "hasTaxDebt": false,
+        "employees": 40,
+        "taxRegime": "ЕСХН"
+      },
+      "bki": {
+        "activeLoans": [
+          {
+            "bank": "Банк Г",
+            "amount": 600000000,
+            "monthlyPayment": 20000000
+          }
+        ],
+        "closedLoans": 4,
+        "maxDelinquencyDays12m": 0,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 0
+      }
+    },
+    {
+      "key": "kozlov",
+      "inn": "771209960382",
+      "ogrn": "326770339075799",
+      "type": "IE",
+      "name": "ИП Козлов Павел Андреевич",
+      "status": "ACTIVE",
+      "registeredAt": "2026-02-03",
+      "okved": "47.71",
+      "okvedName": "Торговля розничная одеждой",
+      "address": "г. Москва, ул. Торговая, д. 5",
+      "directorName": "Павел Андреевич Козлов",
+      "owner": "kozlov@demo.ru",
+      "position": "OWNER",
+      "fin": {
+        "avgMonthlyRevenue": 40000000,
+        "revenueLast6m": 200000000,
+        "revenuePrev6m": 270000000,
+        "existingMonthlyPayments": 0
+      },
+      "tax": {
+        "hasTaxDebt": true,
+        "employees": 2,
+        "taxRegime": "УСН"
+      },
+      "bki": {
+        "activeLoans": [],
+        "closedLoans": 0,
+        "maxDelinquencyDays12m": 60,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 5
+      }
+    },
+    {
+      "key": "romashka",
+      "inn": "7701082460",
+      "ogrn": "1237700383470",
+      "type": "LLC",
+      "name": "ООО «Ромашка»",
+      "status": "LIQUIDATED",
+      "registeredAt": "2023-03-01",
+      "okved": "47.19",
+      "okvedName": "Прочая розничная торговля",
+      "address": "г. Москва, ул. Цветочная, д. 9",
+      "directorName": "Павел Андреевич Козлов",
+      "owner": "kozlov@demo.ru",
+      "position": "OWNER",
+      "fin": {
+        "avgMonthlyRevenue": 100000000,
+        "revenueLast6m": 600000000,
+        "revenuePrev6m": 600000000,
+        "existingMonthlyPayments": 0
+      },
+      "tax": {
+        "hasTaxDebt": false,
+        "employees": 0,
+        "taxRegime": "УСН"
+      },
+      "bki": {
+        "activeLoans": [],
+        "closedLoans": 0,
+        "maxDelinquencyDays12m": 0,
+        "currentDelinquencyDays": 0,
+        "inquiries30d": 0
+      }
+    }
+  ]
+}
