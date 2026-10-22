@@ -14,6 +14,7 @@ import {
   Box,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
+import { useApplicationStore } from '../../store/applicationStore';
 
 // Цели кредита (плитки)
 const LOAN_PURPOSES = [
@@ -39,7 +40,7 @@ export function ProductSelectPage() {
                     (Math.pow(1 + monthlyRate, term) - 1);
     return Math.round(payment);
   };
-
+  const setProductData = useApplicationStore((s) => s.setProductData);
   const monthlyPayment = calculatePayment();
   const overpayment = monthlyPayment * term - amount;
 
@@ -173,14 +174,17 @@ export function ProductSelectPage() {
       </Paper>
 
       {/* Кнопка продолжения */}
-      <Button
-        fullWidth
-        size="lg"
-        disabled={!selectedPurpose}
-        onClick={() => navigate('/client/company')}
-      >
-        Продолжить
-      </Button>
+<Button
+  fullWidth
+  size="lg"
+  disabled={!selectedPurpose}
+  onClick={() => {
+    setProductData(selectedPurpose!, amount, term, 15, monthlyPayment);
+    navigate('/client/company');
+  }}
+>
+  Продолжить
+</Button>
     </Container>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../lib/apiClient';
+import { useApplicationStore } from '../../store/applicationStore';
 
 export function CompanyPage() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export function CompanyPage() {
     type: 'LLC',
     name: '',
   });
-
+  const setCompany = useApplicationStore((s) => s.setCompany);
   const handleSearch = async () => {
     if (inn.length < 10) {
       setError('ИНН должен содержать 10 или 12 цифр');
@@ -58,23 +59,24 @@ export function CompanyPage() {
     }
   };
 
-  const handleUseRegistryData = async () => {
-    try {
-      await apiClient.companies.create(formData);
-      navigate('/client/financials');
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при сохранении компании');
-    }
-  };
-
-  const handleManualSubmit = async () => {
-    try {
-      await apiClient.companies.create(formData);
-      navigate('/client/financials');
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при сохранении компании');
-    }
-  };
+const handleUseRegistryData = async () => {
+  try {
+    const company = await apiClient.companies.create(formData);
+    setCompany(company);
+    navigate('/client/financials');
+  } catch (err: any) {
+    setError(err.message || 'Ошибка при сохранении компании');
+  }
+};
+const handleManualSubmit = async () => {
+  try {
+    const company = await apiClient.companies.create(formData);
+    setCompany(company);
+    navigate('/client/financials');
+  } catch (err: any) {
+    setError(err.message || 'Ошибка при сохранении компании');
+  }
+};
 
   return (
     <Container size="md" py={40}>

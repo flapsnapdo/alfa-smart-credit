@@ -4,7 +4,6 @@ import {
   Title,
   Text,
   Paper,
-  TextInput,
   Button,
   Stack,
   Alert,
@@ -12,6 +11,7 @@ import {
   Group,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
+import { useApplicationStore } from '../../store/applicationStore';
 
 export function FinancialsPage() {
   const navigate = useNavigate();
@@ -23,24 +23,26 @@ export function FinancialsPage() {
     revenuePrev6m: '',
     existingMonthlyPayments: '',
   });
+  const setFinancials = useApplicationStore((s) => s.setFinancials);
+ const handleSubmit = async () => {
+  setLoading(true);
+  setError(null);
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Имитация сохранения финансовых данных
-      console.log('Финансовые данные:', formData);
-      setTimeout(() => {
-        navigate('/client/review');
-      }, 500);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при сохранении');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  try {
+    const financials = {
+      avgMonthlyRevenue: Number(formData.avgMonthlyRevenue) * 100,
+      revenueLast6m: Number(formData.revenueLast6m) * 100,
+      revenuePrev6m: Number(formData.revenuePrev6m) * 100,
+      existingMonthlyPayments: Number(formData.existingMonthlyPayments) * 100,
+    };
+    setFinancials(financials);
+    navigate('/client/review');
+  } catch (err: any) {
+    setError(err.message || 'Ошибка при сохранении');
+  } finally {
+    setLoading(false);
+  }
+};
   const handleSaveDraft = () => {
     console.log('Черновик сохранён:', formData);
     alert('Черновик сохранён!');

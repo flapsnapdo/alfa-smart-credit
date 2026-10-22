@@ -1,31 +1,19 @@
-import {
-  Container,
-  Title,
-  Text,
-  Paper,
-  Stepper,
-  Button,
-  Group,
-  Card,
-  Badge,
-} from '@mantine/core';
+import { Container, Title, Text, Card, Badge, Stepper, Button, Group } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
+import { useApplicationStore } from '../../store/applicationStore';
 
 export function StatusPage() {
   const navigate = useNavigate();
+  const { applicationNumber } = useApplicationStore();
 
   return (
     <Container size="md" py={40}>
-      <Title ta="center" mb={10}>
-        Статус заявки
-      </Title>
-      <Text c="dimmed" ta="center" mb={40}>
-        Ваша заявка отправлена и находится на рассмотрении
-      </Text>
+      <Title ta="center" mb={10}>Статус заявки</Title>
+      <Text c="dimmed" ta="center" mb={40}>Ваша заявка отправлена и находится на рассмотрении</Text>
 
       <Card shadow="sm" padding="xl" radius="md" withBorder mb={40}>
         <Group justify="space-between" mb="md">
-          <Title order={4}>Заявка №ЗК-2026-000123</Title>
+          <Title order={4}>Заявка №{applicationNumber || 'ЗК-2026-000123'}</Title>
           <Badge color="yellow" size="lg">На рассмотрении</Badge>
         </Group>
 
