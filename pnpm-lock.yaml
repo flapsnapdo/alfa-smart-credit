@@ -65,6 +65,9 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@24.19.2)(lightningcss@1.33.0)(sugarss@5.0.2(postcss@8.5.31))(tsx@4.23.15)
 
   apps/mock-external:
     dependencies:

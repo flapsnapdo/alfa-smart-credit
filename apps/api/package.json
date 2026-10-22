@@ -8,7 +8,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=.env.local dist/db/seed.js",
-    "start:local": "node --env-file=.env.local dist/main.js"
+    "start:local": "node --env-file=.env.local dist/main.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@alfa/scoring": "workspace:*",
@@ -30,6 +31,7 @@
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.11",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
   }
 }
