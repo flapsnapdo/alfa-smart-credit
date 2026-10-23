@@ -11,3 +11,6 @@ export function createDb(url = process.env.DATABASE_URL) {
 }
 
 export type Db = ReturnType<typeof createDb>['db'];
+
+/** Транзакция: тот же db, но все запросы внутри выполняются «всё или ничего» */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
