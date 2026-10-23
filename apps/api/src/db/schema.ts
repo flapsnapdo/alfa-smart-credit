@@ -2,6 +2,7 @@ import {
   bigint, boolean, date, doublePrecision, index, integer, jsonb,
   pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid,
 } from 'drizzle-orm/pg-core';
+import type { Factor, Grade, Offer, ScoringInput, StopFactor } from '@alfa/scoring';
 
 // Перечисления: в базе станут типами ENUM, значения только из списка
 export const roleEnum = pgEnum('role', ['CLIENT', 'ANALYST']);
@@ -16,10 +17,13 @@ export const applicationStatusEnum = pgEnum('application_status', [
   'APPROVED', 'COUNTER_OFFER', 'SIGNING', 'ISSUED', 'REJECTED', 'CANCELLED', 'EXPIRED',
 ]);
 export const actorTypeEnum = pgEnum('actor_type', ['CLIENT', 'ANALYST', 'SYSTEM']);
+export const checkSourceEnum = pgEnum('check_source', ['REGISTRY', 'TAX', 'BKI']);
+export const decisionTypeEnum = pgEnum('decision_type', ['APPROVE', 'COUNTER_OFFER', 'MANUAL_REVIEW', 'REJECT']);
 
 export type Role = (typeof roleEnum.enumValues)[number];
 export type ApplicationStatus = (typeof applicationStatusEnum.enumValues)[number];
 export type ActorType = (typeof actorTypeEnum.enumValues)[number];
+export type CheckSource = (typeof checkSourceEnum.enumValues)[number];
 
 // Деньги — bigint в копейках; mode 'number' — в коде обычное число
 const money = (name: string) => bigint(name, { mode: 'number' });
@@ -110,3 +114,45 @@ export const applicationStatusHistory = pgTable('application_status_history', {
   reason: text('reason'),
   createdAt: createdAt(),
 }, (t) => [index('status_history_app_idx').on(t.applicationId)]);
+
+// ── Конвейер: внешние проверки, скоринг, решение ───────────────────
+
+// Что ответили реестр, налоговая и БКИ — чтобы аналитик видел, на чём основано решение
+export const externalChecks = pgTable('external_checks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id').notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  source: checkSourceEnum('source').notNull(),
+  ok: boolean('ok').notNull(),
+  httpStatus: integer('http_status'),
+  durationMs: integer('duration_ms').notNull(),
+  payload: jsonb('payload'),
+  createdAt: createdAt(),
+}, (t) => [index('external_checks_app_idx').on(t.applicationId)]);
+
+// Результат скоринга: баллы, рейтинг, факторы и входные данные, по которым считали
+export const scoringResults = pgTable('scoring_results', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id').notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  score: integer('score').notNull(),
+  grade: text('grade').$type<Grade>().notNull(),
+  factors: jsonb('factors').$type<Factor[]>().notNull(),
+  stopFactors: jsonb('stop_factors').$type<StopFactor[]>().notNull(),
+  input: jsonb('input').$type<ScoringInput>().notNull(),
+  rulesVersion: text('rules_version').notNull(),
+  createdAt: createdAt(),
+}, (t) => [index('scoring_results_app_idx').on(t.applicationId)]);
+
+// Решение по заявке: от системы или от аналитика. Последнее по времени — действующее
+export const decisions = pgTable('decisions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id').notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  type: decisionTypeEnum('type').notNull(),
+  rate: doublePrecision('rate'),
+  maxAvailableAmount: money('max_available_amount').notNull(),
+  offer: jsonb('offer').$type<Offer>(),
+  alternatives: jsonb('alternatives').$type<Offer[]>().notNull().default([]),
+  reasons: jsonb('reasons').$type<string[]>().notNull().default([]),
+  actorType: actorTypeEnum('actor_type').notNull(),
+  actorId: uuid('actor_id'),
+  createdAt: createdAt(),
+}, (t) => [index('decisions_app_idx').on(t.applicationId)]);
