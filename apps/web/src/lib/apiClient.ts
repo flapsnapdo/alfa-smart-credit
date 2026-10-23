@@ -1,144 +1,81 @@
-import type { Schemas } from '../types/api';
+const API_BASE = 'http://localhost:3000/api/v1';
 
-const API_BASE = '/api/v1';
+function getToken(): string | null {
+  return localStorage.getItem('auth_token');
+}
 
-// Типы для запросов/ответов
-type LoginRequest = { email: string; password: string };
-type LoginResponse = { token: string; user: Schemas['User'] };
+function setToken(token: string) {
+  localStorage.setItem('auth_token', token);
+}
+
+function clearToken() {
+  localStorage.removeItem('auth_token');
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: any,
+  requireAuth = false
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (requireAuth) {
+    const token = getToken();
+    if (!token) throw new Error('Не авторизован');
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: 'Ошибка сервера' }));
+    throw new Error(error.message || `Ошибка ${res.status}`);
+  }
+
+  return res.json();
+}
 
 export const apiClient = {
-  // Аутентификация
   auth: {
-    login: async (data: LoginRequest): Promise<LoginResponse> => {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Ошибка входа');
-      return response.json();
-    },
-
-    getMe: async (): Promise<{ user: Schemas['User']; companies: Schemas['Company'][] }> => {
-      const response = await fetch(`${API_BASE}/me`);
-      if (!response.ok) throw new Error('Ошибка получения профиля');
-      return response.json();
-    },
+    login: (email: string, password: string) =>
+      request<{ token: string; user: any }>('POST', '/auth/login', { email, password }),
   },
-
-  // Реестр компаний
-  registry: {
-    lookup: async (inn: string): Promise<Schemas['RegistryRecord']> => {
-      const response = await fetch(`${API_BASE}/registry/lookup?inn=${inn}`);
-      if (response.status === 404) throw new Error('Компания не найдена в реестре');
-      if (response.status === 503) throw new Error('Сервис реестра временно недоступен');
-      if (!response.ok) throw new Error('Ошибка при поиске компании');
-      return response.json();
-    },
-  },
-
-  // Компании
-  companies: {
-    create: async (data: Schemas['CompanyInput']): Promise<Schemas['Company']> => {
-      const response = await fetch(`${API_BASE}/companies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Ошибка создания компании');
-      return response.json();
-    },
-
-    updateFinancials: async (
-      companyId: string,
-      financials: Schemas['Financials']
-    ): Promise<Schemas['Financials']> => {
-      const response = await fetch(`${API_BASE}/companies/${companyId}/financials`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(financials),
-      });
-      if (!response.ok) throw new Error('Ошибка обновления финансовых данных');
-      return response.json();
-    },
-  },
-
-  // Продукты
+  me: () => request<any>('GET', '/me', undefined, true),
   products: {
-    getList: async (): Promise<Schemas['Product'][]> => {
-      const response = await fetch(`${API_BASE}/products`);
-      if (!response.ok) throw new Error('Ошибка получения продуктов');
-      return response.json();
-    },
-
-    recommend: async (data: {
-      purpose: Schemas['Purpose'];
-      amount: number;
-      term: number;
-    }): Promise<{
-      recommended: Schemas['Product'];
-      alternative?: Schemas['Product'];
-      rate: number;
-      monthlyPayment: number;
-    }> => {
-      const response = await fetch(`${API_BASE}/products/recommend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Ошибка подбора продукта');
-      return response.json();
-    },
+    list: () => request<any[]>('GET', '/products'),
+    recommend: (data: any) =>
+      request<any>('POST', '/products/recommend', data, true),
   },
-
-  // Заявки
+  registry: {
+    lookup: (inn: string) =>
+      request<any>('GET', `/registry/lookup?inn=${inn}`, undefined, true),
+  },
+  companies: {
+    create: (data: any) =>
+      request<any>('POST', '/companies', data, true),
+    updateFinancials: (companyId: string, data: any) =>
+      request<any>('PUT', `/companies/${companyId}/financials`, data, true),
+  },
   applications: {
-    getList: async (): Promise<Schemas['Application'][]> => {
-      const response = await fetch(`${API_BASE}/applications`);
-      if (!response.ok) throw new Error('Ошибка получения заявок');
-      return response.json();
-    },
-
-    create: async (data: Schemas['ApplicationInput']): Promise<Schemas['Application']> => {
-      const response = await fetch(`${API_BASE}/applications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Ошибка создания заявки');
-      return response.json();
-    },
-
-    getById: async (id: string): Promise<Schemas['Application']> => {
-      const response = await fetch(`${API_BASE}/applications/${id}`);
-      if (!response.ok) throw new Error('Ошибка получения заявки');
-      return response.json();
-    },
-
-    update: async (id: string, data: Schemas['ApplicationInput']): Promise<Schemas['Application']> => {
-      const response = await fetch(`${API_BASE}/applications/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Ошибка обновления заявки');
-      return response.json();
-    },
-
-    submit: async (id: string, bkiConsent: boolean): Promise<Schemas['Application']> => {
-      const response = await fetch(`${API_BASE}/applications/${id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bkiConsent }),
-      });
-      if (!response.ok) throw new Error('Ошибка отправки заявки');
-      return response.json();
-    },
-
-    getTimeline: async (id: string): Promise<Schemas['StatusChange'][]> => {
-      const response = await fetch(`${API_BASE}/applications/${id}/timeline`);
-      if (!response.ok) throw new Error('Ошибка получения таймлайна');
-      return response.json();
-    },
+    list: () => request<any[]>('GET', '/applications', undefined, true),
+    create: (data: any) =>
+      request<any>('POST', '/applications', data, true),
+    get: (id: string) =>
+      request<any>('GET', `/applications/${id}`, undefined, true),
+    update: (id: string, data: any) =>
+      request<any>('PATCH', `/applications/${id}`, data, true),
+    submit: (id: string, bkiConsent: boolean) =>
+      request<any>('POST', `/applications/${id}/submit`, { bkiConsent }, true),
+    timeline: (id: string) =>
+      request<any[]>('GET', `/applications/${id}/timeline`, undefined, true),
   },
 };
+
+export { getToken, setToken, clearToken };

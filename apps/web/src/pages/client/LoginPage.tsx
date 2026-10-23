@@ -1,97 +1,142 @@
+import { useState } from 'react';
 import {
-  Button,
   TextInput,
   PasswordInput,
-  Paper,
+  Button,
   Title,
   Text,
-  Container,
-  Stack,
   Group,
+  Divider,
+  Stack,
+  Alert,
 } from '@mantine/core';
-import { useForm } from '@mantine/form';
 import { useNavigate } from 'react-router-dom';
+import { useApplicationStore } from '../../store/applicationStore';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const resetStore = useApplicationStore((s) => s.reset);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  // Форма с валидацией
-  const form = useForm({
-    initialValues: { email: '', password: '' },
-    validate: {
-      email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Некорректный email'),
-      password: (value) => (value.length >= 6 ? null : 'Пароль должен быть не менее 6 символов'),
-    },
-  });
-
-  // Обработчик входа (пока имитация)
-  const handleLogin = (values: typeof form.values, role?: 'client' | 'analyst') => {
-    console.log('Вход:', values, role ? `Роль: ${role}` : '');
-    
-    // Имитация задержки сети
-    setTimeout(() => {
-      if (role === 'analyst') {
-        navigate('/analyst/dashboard');
-      } else {
-        navigate('/client/product-select');
-      }
-    }, 500);
-  };
-
+const handleLogin = (role: 'CLIENT' | 'ANALYST') => {
+  resetStore();
+  setError(null);
+  
+  // Сохраняем тестовый токен
+  localStorage.setItem('auth_token', 'demo-token-' + role.toLowerCase());
+  
+  if (role === 'CLIENT') {
+    navigate('/client/product-select');
+  } else {
+    navigate('/analyst/dashboard');
+  }
+};
   return (
-    <Container size={420} my={40}>
-      <Title ta="center" style={{ fontSize: '2rem', fontWeight: 700 }}>
-        Умный кредитный кабинет 🚀
-      </Title>
-      <Text c="dimmed" size="sm" ta="center" mt={5}>
-        Альфа-Хакатон 2026
-      </Text>
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      {/* Левая часть — фото */}
+      <div
+        style={{
+          flex: 1,
+          background: `
+            linear-gradient(135deg, rgba(239, 49, 36, 0.85) 0%, rgba(201, 42, 42, 0.9) 100%),
+            url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80')
+          `,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '80px',
+          color: 'white',
+        }}
+      >
+        <Title order={1} size={48} mb={20} fw={700} style={{ color: 'white', textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
+          Альфа-Кредит
+        </Title>
+        <Text size="xl" mb={40} style={{ opacity: 0.9, maxWidth: 500 }}>
+          Умный кредитный кабинет для бизнеса. Подберём лучшие условия за 5 минут.
+        </Text>
+        <Stack gap="md">
+          <Group>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+              
+            </div>
+            <Text>Решение за 1 рабочий день</Text>
+          </Group>
+          <Group>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+              📊
+            </div>
+            <Text>Ставки от 14% годовых</Text>
+          </Group>
+          <Group>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+              
+            </div>
+            <Text>До 5 млрд ₽ на любые цели</Text>
+          </Group>
+        </Stack>
+      </div>
 
-      <Paper withBorder shadow="md" p={30} mt={30} radius="md">
-        {/* Основная форма входа */}
-        <form onSubmit={form.onSubmit((values) => handleLogin(values))}>
-          <Stack>
+      {/* Правая часть — форма */}
+      <div
+        style={{
+          width: 500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'white',
+          padding: 40,
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: 380 }}>
+          <Title order={2} mb={5} ta="center">
+            Вход в кабинет
+          </Title>
+          <Text c="dimmed" ta="center" mb={40}>
+            Альфа-Банк • Хакатон 2026
+          </Text>
+
+          {error && (
+            <Alert color="red" mb="lg" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <Stack gap="md">
             <TextInput
               label="Email"
               placeholder="hello@alfa.ru"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              {...form.getInputProps('email')}
             />
             <PasswordInput
               label="Пароль"
               placeholder="Ваш пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
-              {...form.getInputProps('password')}
             />
-            <Button type="submit" fullWidth mt="xl">
+            <Button size="lg" color="red" fullWidth mt="md">
               Войти
             </Button>
           </Stack>
-        </form>
 
-        {/* Кнопки быстрого входа для демо */}
-        <div style={{ marginTop: '2rem', borderTop: '1px solid #eee', paddingTop: '1rem' }}>
-          <Text size="xs" c="dimmed" ta="center" mb="xs">
-            Быстрый вход для демонстрации (без пароля):
-          </Text>
+          <Divider my="xl" label="Быстрый вход для демо" labelPosition="center" />
+
           <Group grow>
-            <Button
-              variant="light"
-              color="blue"
-              onClick={() => handleLogin({ email: 'client@test.ru', password: '123456' }, 'client')}
-            >
+            <Button variant="light" color="blue" onClick={() => handleLogin('CLIENT')}>
               Я Клиент
             </Button>
-            <Button
-              variant="light"
-              color="green"
-              onClick={() => handleLogin({ email: 'analyst@test.ru', password: '123456' }, 'analyst')}
-            >
+            <Button variant="light" color="green" onClick={() => handleLogin('ANALYST')}>
               Я Аналитик
             </Button>
           </Group>
         </div>
-      </Paper>
-    </Container>
+      </div>
+    </div>
   );
 }

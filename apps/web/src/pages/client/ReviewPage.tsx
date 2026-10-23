@@ -48,7 +48,7 @@ export function ReviewPage() {
       const application = await apiClient.applications.submit('app-1', bkiConsent);
       setBkiConsentStore(bkiConsent);
       setApplication(application.id || 'unknown-id', application.number || 'ЗК-2026-000000');
-      navigate('/client/status');
+      navigate('/client/documents');
     } catch (err: any) {
       setError(err.message || 'Ошибка при отправке');
     } finally {

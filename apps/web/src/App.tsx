@@ -7,6 +7,9 @@ import { ReviewPage } from './pages/client/ReviewPage';
 import { StatusPage } from './pages/client/StatusPage';
 import { ApplicationsPage } from './pages/client/ApplicationsPage';
 import { ClientLayout } from './components/ClientLayout';
+import { DocumentsPage } from './pages/client/DocumentsPage';
+import { OfferPage } from './pages/client/OfferPage';
+import { SigningPage } from './pages/client/SigningPage';
 
 export default function App() {
   return (
@@ -21,6 +24,9 @@ export default function App() {
         <Route path="/client/review" element={<ReviewPage />} />
         <Route path="/client/status" element={<StatusPage />} />
         <Route path="/client/dashboard" element={<ApplicationsPage />} />
+        <Route path="/client/documents" element={<DocumentsPage />} />
+        <Route path="/client/offer" element={<OfferPage />} />
+        <Route path="/client/signing" element={<SigningPage />} />
       </Route>
 
       <Route 
