@@ -7,7 +7,7 @@ import { AuthUser } from '../auth/current-user.decorator';
 import { Db } from '../db/client';
 import { DB } from '../db/db.module';
 import {
-  ActorType, ApplicationStatus, applicationStatusHistory, applications, companies, companyMembers, products,
+  ActorType, ApplicationStatus, applicationStatusHistory, applications, companies, companyMembers, decisions, products,
 } from '../db/schema';
 import { CreateApplicationDto } from './application.dto';
 import { CLIENT_VIEW } from './client-view';
@@ -90,6 +90,12 @@ export class ApplicationsService {
       throw new ForbiddenException('Нет доступа к этой заявке');
     }
 
+    // Действующее решение — самое последнее по времени
+    const [decision] = await this.db.select().from(decisions)
+      .where(eq(decisions.applicationId, id))
+      .orderBy(desc(decisions.createdAt))
+      .limit(1);
+
     const { app } = row;
     return {
       id: app.id, number: toNumber(app.seq), status: app.status,
@@ -99,6 +105,10 @@ export class ApplicationsService {
       purpose: app.purpose,
       requested: { amount: app.requestedAmount, term: app.requestedTerm },
       bkiConsentAt: app.bkiConsentAt, submittedAt: app.submittedAt,
+      decision: decision ? {
+        type: decision.type, rate: decision.rate, maxAvailableAmount: decision.maxAvailableAmount,
+        offer: decision.offer, alternatives: decision.alternatives, reasons: decision.reasons,
+      } : null,
       version: app.version, createdAt: app.createdAt, updatedAt: app.updatedAt,
     };
   }
