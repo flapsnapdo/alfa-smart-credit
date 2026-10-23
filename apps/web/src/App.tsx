@@ -10,6 +10,9 @@ import { ClientLayout } from './components/ClientLayout';
 import { DocumentsPage } from './pages/client/DocumentsPage';
 import { OfferPage } from './pages/client/OfferPage';
 import { SigningPage } from './pages/client/SigningPage';
+import { A1 } from './pages/analyst/A1';
+import { A2 } from './pages/analyst/A2';
+import { A3 } from './pages/analyst/A3';
 
 export default function App() {
   return (
@@ -29,15 +32,9 @@ export default function App() {
         <Route path="/client/signing" element={<SigningPage />} />
       </Route>
 
-      <Route 
-        path="/analyst/dashboard" 
-        element={
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <h1>Кабинет аналитика</h1>
-            <p>В разработке...</p>
-          </div>
-        } 
-      />
+     <Route path="/analyst/dashboard" element={<A1 />} />
+<Route path="/analyst/application/:id" element={<A2 />} />
+<Route path="/analyst/application/:id/decision" element={<A3 />} />
     </Routes>
   );
 }

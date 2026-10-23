@@ -145,4 +145,159 @@ http.post('*/api/v1/companies', ({ request }) => {
       status: 'SUBMITTED',
     });
   }),
+
+    // ============ АНАЛИТИК ============
+  
+  // Список заявок для аналитика
+  http.get('*/api/v1/analyst/applications', () => {
+    return HttpResponse.json([
+      {
+        id: 'app-1',
+        number: 'ЗК-2026-000123',
+        companyName: 'ПАО "Сбербанк"',
+        inn: '7707083893',
+        amount: 5000000,
+        term: 12,
+        purpose: 'working-capital',
+        status: 'SUBMITTED',
+        createdAt: '2026-10-20T10:00:00Z',
+        score: 78,
+      },
+      {
+        id: 'app-2',
+        number: 'ЗК-2026-000124',
+        companyName: 'ООО "Северный склад"',
+        inn: '7707083894',
+        amount: 12000000,
+        term: 24,
+        purpose: 'equipment',
+        status: 'UNDER_REVIEW',
+        createdAt: '2026-10-21T14:30:00Z',
+        score: 65,
+      },
+      {
+        id: 'app-3',
+        number: 'ЗК-2026-000125',
+        companyName: 'ООО "ТехноПром"',
+        inn: '7707083895',
+        amount: 3000000,
+        term: 6,
+        purpose: 'inventory',
+        status: 'SUBMITTED',
+        createdAt: '2026-10-22T09:15:00Z',
+        score: 82,
+      },
+      {
+        id: 'app-4',
+        number: 'ЗК-2026-000126',
+        companyName: 'ООО "СтройМастер"',
+        inn: '7707083896',
+        amount: 25000000,
+        term: 36,
+        purpose: 'expansion',
+        status: 'SUBMITTED',
+        createdAt: '2026-10-23T11:00:00Z',
+        score: 55,
+      },
+    ]);
+  }),
+
+  // Карточка заявки для аналитика
+  http.get('*/api/v1/analyst/applications/:id', ({ params }) => {
+    const id = params.id as string;
+    const applications: Record<string, any> = {
+      'app-1': {
+        id: 'app-1',
+        number: 'ЗК-2026-000123',
+        companyName: 'ПАО "Сбербанк"',
+        inn: '7707083893',
+        ogrn: '1027700132195',
+        amount: 5000000,
+        term: 12,
+        rate: 18,
+        purpose: 'working-capital',
+        status: 'SUBMITTED',
+        createdAt: '2026-10-20T10:00:00Z',
+        score: 78,
+        directorName: 'Греф Герман Оскарович',
+        revenue: 150000000,
+        profit: 25000000,
+        debt: 10000000,
+        employees: 120,
+        address: 'г. Москва, ул. Вавилова, д. 19',
+      },
+      'app-2': {
+        id: 'app-2',
+        number: 'ЗК-2026-000124',
+        companyName: 'ООО "Северный склад"',
+        inn: '7707083894',
+        ogrn: '1027700132196',
+        amount: 12000000,
+        term: 24,
+        rate: 18,
+        purpose: 'equipment',
+        status: 'UNDER_REVIEW',
+        createdAt: '2026-10-21T14:30:00Z',
+        score: 65,
+        directorName: 'Иванов Иван Иванович',
+        revenue: 45000000,
+        profit: 5000000,
+        debt: 20000000,
+        employees: 35,
+        address: 'г. Москва, ул. Вавилова, д. 19',
+      },
+      'app-3': {
+        id: 'app-3',
+        number: 'ЗК-2026-000125',
+        companyName: 'ООО "ТехноПром"',
+        inn: '7707083895',
+        ogrn: '1027700132197',
+        amount: 3000000,
+        term: 6,
+        rate: 18,
+        purpose: 'inventory',
+        status: 'SUBMITTED',
+        createdAt: '2026-10-22T09:15:00Z',
+        score: 82,
+        directorName: 'Петров Сергей Владимирович',
+        revenue: 80000000,
+        profit: 12000000,
+        debt: 5000000,
+        employees: 60,
+        address: 'г. Санкт-Петербург, пр. Обуховской Обороны, д. 120',
+      },
+      'app-4': {
+        id: 'app-4',
+        number: 'ЗК-2026-000126',
+        companyName: 'ООО "СтройМастер"',
+        inn: '7707083896',
+        ogrn: '1027700132198',
+        amount: 25000000,
+        term: 36,
+        rate: 18,
+        purpose: 'expansion',
+        status: 'SUBMITTED',
+        createdAt: '2026-10-23T11:00:00Z',
+        score: 55,
+        directorName: 'Сидоров Алексей Петрович',
+        revenue: 200000000,
+        profit: 15000000,
+        debt: 80000000,
+        employees: 200,
+        address: 'г. Москва, ул. Ленина, д. 5',
+      },
+    };
+
+    return HttpResponse.json(applications[id] || applications['app-1']);
+  }),
+
+  // Решение аналитика
+  http.patch('*/api/v1/analyst/applications/:id/decision', async ({ request }) => {
+    const body: any = await request.json();
+    return HttpResponse.json({
+      id: 'app-1',
+      decision: body.decision,
+      message: 'Решение принято',
+    });
+  }),
 ];
