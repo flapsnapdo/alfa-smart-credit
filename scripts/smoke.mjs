@@ -65,9 +65,20 @@ async function check(s) {
   const offer = d?.offer ? `${rub(d.offer.amount)} на ${d.offer.term} мес под ${d.offer.rate}%` : '';
   const alt = d?.alternatives?.length ? ` или ${rub(d.alternatives[0].amount)} на ${d.alternatives[0].term} мес` : '';
   const reasons = d?.reasons?.length ? ` · ${d.reasons.join('; ')}` : '';
-  const mark = app.status === s.expect ? '✅' : '❌';
-  console.log(`${mark} ${company.name}: ${app.status} (ждали ${s.expect}) ${offer}${alt}${reasons}`);
-  return app.status === s.expect;
+  let ok = app.status === s.expect;
+
+  // Одобрено или контрпредложение — доводим до выдачи: принять → подписать кодом из кабинета
+  let issued = '';
+  if (ok && ['APPROVED', 'COUNTER_OFFER'].includes(app.status)) {
+    const contract = await api(`/applications/${app.id}/accept`, { token, body: { offerIndex: 0 } });
+    const signed = await api(`/applications/${app.id}/sign`, { token, body: { code: contract.demoSignCode } });
+    ok = signed.status === 'ISSUED';
+    issued = ` → ${signed.status} (${signed.number})`;
+  }
+
+  const mark = ok ? '✅' : '❌';
+  console.log(`${mark} ${company.name}: ${app.status} (ждали ${s.expect}) ${offer}${alt}${reasons}${issued}`);
+  return ok;
 }
 
 const results = await Promise.all(SCENARIOS.map(runScenario));
