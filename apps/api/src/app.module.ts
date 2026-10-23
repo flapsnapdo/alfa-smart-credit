@@ -7,9 +7,10 @@ import { ExplanationModule } from './explanation/explanation.module';
 import { HealthController } from './health/health.controller';
 import { ProductsModule } from './products/products.module';
 import { RegistryModule } from './registry/registry.module';
+import { ContractsModule } from './contracts/contracts.module';
 
 @Module({
-  imports: [DbModule, AuthModule, ProductsModule, RegistryModule, ApplicationsModule, ExplanationModule, AnalystModule],
+  imports: [DbModule, AuthModule, ProductsModule, RegistryModule, ApplicationsModule, ExplanationModule, AnalystModule, ContractsModule],
   controllers: [HealthController],
 })
 export class AppModule {}
