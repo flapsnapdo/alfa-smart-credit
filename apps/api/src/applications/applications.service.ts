@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { AuthUser } from '../auth/current-user.decorator';
-import { Db } from '../db/client';
+import { Db, Tx } from '../db/client';
 import { DB } from '../db/db.module';
 import {
   ActorType, ApplicationStatus, applicationStatusHistory, applications, companies, companyMembers, decisions, products,
@@ -14,7 +14,7 @@ import { CLIENT_VIEW } from './client-view';
 import { assertTransition, InvalidTransitionError } from './status-machine';
 
 /** Номер заявки для людей: ЗК-2026-000042 */
-const toNumber = (seq: number) => `ЗК-2026-${String(seq).padStart(6, '0')}`;
+export const toNumber = (seq: number) => `ЗК-2026-${String(seq).padStart(6, '0')}`;
 
 @Injectable()
 export class ApplicationsService {
@@ -127,6 +127,7 @@ export class ApplicationsService {
   async changeStatus(
     id: string, to: ApplicationStatus, actor: ActorType, actorId: string | null,
     reason?: string, extra: Partial<typeof applications.$inferInsert> = {},
+    inTx?: (tx: Tx) => Promise<void>,   // дополнительная запись в той же транзакции
   ) {
     await this.db.transaction(async (tx) => {
       const [app] = await tx.select().from(applications).where(eq(applications.id, id));
@@ -153,6 +154,8 @@ export class ApplicationsService {
       await tx.insert(applicationStatusHistory).values({
         applicationId: id, fromStatus: app.status, toStatus: to, actorType: actor, actorId, reason,
       });
+
+      if (inTx) await inTx(tx);
     });
   }
 
