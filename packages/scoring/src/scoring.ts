@@ -75,7 +75,7 @@ export function computeFactors(input: ScoringInput): Factor[] {
     code: 'INDUSTRY_RISK', value: ind,
     points: ind === 'LOW' ? 0 : ind === 'MEDIUM' ? -20 : -40,
     analystText: 'Риск отрасли: низкий 0, средний −20, высокий −40',
-    clientText: ind === 'HIGH' ? 'Отрасль с повышенным риском' : 'Отраслевой риск учтён',
+    clientText: ind === 'HIGH' ? 'Отрасль с повышенным риском' : ind === 'MEDIUM' ? 'Отрасль со средним уровнем риска' : 'Отрасль с низким риском',
   });
 
   f.push({
