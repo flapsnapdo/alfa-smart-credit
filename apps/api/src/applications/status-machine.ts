@@ -32,7 +32,8 @@ export const TRANSITIONS: Record<ApplicationStatus, Transition[]> = {
   ],
   ENRICHMENT: [
     { to: 'SCORING', by: SYSTEM },
-    { to: 'REJECTED', by: SYSTEM },                  // стоп-фактор из реестра
+    { to: 'REJECTED', by: SYSTEM },
+    { to: 'MANUAL_REVIEW', by: SYSTEM },             // внешний сервис не ответил — решит человек                  // стоп-фактор из реестра
     { to: 'CANCELLED', by: CLIENT },
   ],
   SCORING: [

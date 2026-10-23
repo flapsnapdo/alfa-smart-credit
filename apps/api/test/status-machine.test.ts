@@ -43,4 +43,8 @@ describe('машина состояний заявки', () => {
     expect(() => assertTransition('DRAFT', 'ISSUED', 'CLIENT')).toThrow(InvalidTransitionError);
     expect(() => assertTransition('DRAFT', 'SUBMITTED', 'CLIENT')).not.toThrow();
   });
+    it('если внешний сервис недоступен, заявка уходит к аналитику, а не зависает', () => {
+    expect(canTransition('ENRICHMENT', 'MANUAL_REVIEW', 'SYSTEM')).toBe(true);
+    expect(canTransition('ENRICHMENT', 'MANUAL_REVIEW', 'CLIENT')).toBe(false);
+  });
 });
