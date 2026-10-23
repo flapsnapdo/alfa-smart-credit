@@ -156,3 +156,17 @@ export const decisions = pgTable('decisions', {
   actorId: uuid('actor_id'),
   createdAt: createdAt(),
 }, (t) => [index('decisions_app_idx').on(t.applicationId)]);
+
+// ── Договор: принятое предложение, подписание и выдача ─────────────
+export const contracts = pgTable('contracts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id').notNull().unique().references(() => applications.id, { onDelete: 'cascade' }),
+  number: text('number').notNull().unique(),           // ДГ-2026-000042
+  offer: jsonb('offer').$type<Offer>().notNull(),      // условия, которые принял клиент
+  signRequestId: text('sign_request_id'),
+  demoSignCode: text('demo_sign_code'),                // по условиям кейса всё внутри продукта: код показываем в кабинете, без СМС
+  signedAt: timestamp('signed_at', { withTimezone: true }),
+  payoutId: text('payout_id'),
+  issuedAt: timestamp('issued_at', { withTimezone: true }),
+  createdAt: createdAt(),
+});
