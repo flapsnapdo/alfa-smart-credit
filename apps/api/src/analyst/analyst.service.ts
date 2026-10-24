@@ -6,8 +6,11 @@ import { AuthUser } from '../auth/current-user.decorator';
 import { Db } from '../db/client';
 import { DB } from '../db/db.module';
 import {
-  ApplicationStatus, applications, companies, decisions, externalChecks, products, scoringResults,
+  ApplicationStatus, applications, companies, decisions, externalChecks, infoRequests, products, scoringResults,
 } from '../db/schema';
+import { DOC_TITLES } from '../documents/doc-requirements';
+import { RequestInfoDto } from '../documents/documents.dto';
+import { DocumentsService } from '../documents/documents.service';
 import { AnalystDecisionDto, AnalystDecisionType } from './analyst.dto';
 
 const STATUS_BY_DECISION: Record<AnalystDecisionType, ApplicationStatus> = {
@@ -21,6 +24,7 @@ export class AnalystService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly apps: ApplicationsService,
+    private readonly docs: DocumentsService,
   ) {}
 
   /** Очередь: по умолчанию — заявки, которые ждут аналитика. Самые давние сверху */
@@ -58,7 +62,7 @@ export class AnalystService {
   /** Карточка: заявка + ответы внешних сервисов + скоринг + все решения + история */
   async card(user: AuthUser, id: string) {
     const application = await this.apps.get(user, id);   // 404, если заявки нет
-    const [checks, [scoring], allDecisions, history] = await Promise.all([
+    const [checks, [scoring], allDecisions, history, docs, checklist] = await Promise.all([
       this.db.select().from(externalChecks)
         .where(eq(externalChecks.applicationId, id)).orderBy(asc(externalChecks.createdAt)),
       this.db.select().from(scoringResults)
@@ -66,6 +70,8 @@ export class AnalystService {
       this.db.select().from(decisions)
         .where(eq(decisions.applicationId, id)).orderBy(asc(decisions.createdAt)),
       this.apps.timeline(user, id),
+      this.docs.documentsOf(id),
+      this.docs.checklist(id),
     ]);
 
     return {
@@ -82,6 +88,8 @@ export class AnalystService {
         actorType: d.actorType, createdAt: d.createdAt,
       })),
       history,
+      documents: docs,
+      documentRequests: checklist.requests,
     };
   }
 
@@ -120,6 +128,18 @@ export class AnalystService {
         actorId: user.id,
       });
     });
+    return this.apps.get(user, id);
+  }
+
+  /** Аналитик запрашивает документ: заявка уходит клиенту, после загрузки конвейер продолжит сам */
+  async requestInfo(user: AuthUser, id: string, dto: RequestInfoDto) {
+    await this.apps.changeStatus(id, 'INFO_REQUESTED', 'ANALYST', user.id,
+      `Запрошен документ «${DOC_TITLES[dto.docType]}»: ${dto.comment}`, {},
+      async (tx) => {
+        await tx.insert(infoRequests).values({
+          applicationId: id, docType: dto.docType, comment: dto.comment, actorType: 'ANALYST', actorId: user.id,
+        });
+      });
     return this.apps.get(user, id);
   }
 }
