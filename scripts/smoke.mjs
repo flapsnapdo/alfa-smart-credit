@@ -5,13 +5,14 @@ const API = process.env.API_URL ?? 'http://127.0.0.1:3000/api/v1';
 const PASSWORD = 'Demo2026!';
 const FINAL = ['APPROVED', 'COUNTER_OFFER', 'MANUAL_REVIEW', 'REJECTED'];
 
-// Суммы — в рублях, в API отправляем копейки
+// Суммы — в рублях, в API отправляем копейки.
+// docs: 'before' — счёт на оборудование прикладываем к черновику; 'on-request' — забываем, банк запросит, догружаем
 const SCENARIOS = [
   { user: 'igor@demo.ru', company: 'Северный склад', product: 'WORKING_CAPITAL', purpose: 'WORKING_CAPITAL', amount: 1_500_000, term: 24, expect: 'APPROVED' },
-  { user: 'anna@demo.ru', company: 'Смирнова', product: 'EQUIPMENT', purpose: 'EQUIPMENT', amount: 1_000_000, term: 36, expect: 'APPROVED' },
-  { user: 'olga@demo.ru', company: 'Хлебный дом', product: 'EQUIPMENT', purpose: 'EQUIPMENT', amount: 900_000, term: 24, expect: 'COUNTER_OFFER' },
+  { user: 'anna@demo.ru', company: 'Смирнова', product: 'EQUIPMENT', purpose: 'EQUIPMENT', amount: 1_000_000, term: 36, expect: 'APPROVED', docs: 'on-request' },
+  { user: 'olga@demo.ru', company: 'Хлебный дом', product: 'EQUIPMENT', purpose: 'EQUIPMENT', amount: 900_000, term: 24, expect: 'COUNTER_OFFER', docs: 'before' },
   { user: 'olga@demo.ru', company: 'СтройМастер', product: 'WORKING_CAPITAL', purpose: 'WORKING_CAPITAL', amount: 2_000_000, term: 24, expect: 'MANUAL_REVIEW' },
-  { user: 'olga@demo.ru', company: 'Агротех', product: 'EQUIPMENT', purpose: 'EQUIPMENT', amount: 8_000_000, term: 60, expect: 'MANUAL_REVIEW' },
+  { user: 'olga@demo.ru', company: 'Агротех', product: 'EQUIPMENT', purpose: 'EQUIPMENT', amount: 8_000_000, term: 60, expect: 'MANUAL_REVIEW', docs: 'before' },
   { user: 'kozlov@demo.ru', company: 'Козлов', product: 'OVERDRAFT', purpose: 'CASH_GAP', amount: 300_000, term: 12, expect: 'REJECTED' },
   { user: 'kozlov@demo.ru', company: 'Ромашка', product: 'OVERDRAFT', purpose: 'CASH_GAP', amount: 500_000, term: 6, expect: 'REJECTED' },
 ];
@@ -29,6 +30,19 @@ async function api(path, { token, body } = {}) {
   }
   const data = await res.json();
   if (!res.ok) throw new Error(`${path} → ${res.status}: ${JSON.stringify(data.message ?? data)}`);
+  return data;
+}
+
+/** Загрузка документа: multipart/form-data, как из браузера. Вместо настоящего счёта — крошечный PDF */
+async function upload(appId, docType, token) {
+  const form = new FormData();
+  form.append('docType', docType);
+  form.append('file', new Blob(['%PDF-1.4 демо-документ'], { type: 'application/pdf' }), `${docType}.pdf`);
+  const res = await fetch(`${API}/applications/${appId}/documents`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`загрузка ${docType} → ${res.status}: ${data.message}`);
   return data;
 }
 
@@ -53,12 +67,20 @@ async function check(s) {
     token,
     body: { companyId: company.id, productCode: s.product, purpose: s.purpose, amount: s.amount * 100, term: s.term },
   });
+  if (s.docs === 'before') await upload(app.id, 'EQUIPMENT_INVOICE', token);
   app = await api(`/applications/${app.id}/submit`, { token, body: { bkiConsent: true } });
 
   // Опрашиваем статус раз в секунду, как будет делать фронтенд
-  for (let i = 0; i < 30 && !FINAL.includes(app.status); i++) {
+  let requested = '';
+  for (let i = 0; i < 40 && !FINAL.includes(app.status); i++) {
     await sleep(1000);
     app = await api(`/applications/${app.id}`, { token });
+    // Банк запросил документы — догружаем всё из списка, конвейер продолжит сам
+    if (app.status === 'INFO_REQUESTED' && s.docs === 'on-request') {
+      const { missing } = await api(`/applications/${app.id}/documents`, { token });
+      for (const doc of missing) await upload(app.id, doc.docType, token);
+      requested = ` · дозапрос: ${missing.map((d) => d.title).join(', ')} → загружено`;
+    }
   }
 
   const d = app.decision;
@@ -77,7 +99,7 @@ async function check(s) {
   }
 
   const mark = ok ? '✅' : '❌';
-  console.log(`${mark} ${company.name}: ${app.status} (ждали ${s.expect}) ${offer}${alt}${reasons}${issued}`);
+  console.log(`${mark} ${company.name}: ${app.status} (ждали ${s.expect}) ${offer}${alt}${reasons}${requested}${issued}`);
   return ok;
 }
 
