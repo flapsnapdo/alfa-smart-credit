@@ -1,183 +1,186 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Container,
   Title,
   Text,
-  Paper,
-  SimpleGrid,
   Card,
-  Slider,
-  Group,
   Button,
   Stack,
+  Group,
+  NumberInput,
   Badge,
-  Box,
+  Paper,
+  Alert,
+  Loader,
 } from '@mantine/core';
+import { IconWallet, IconTools, IconPackage, IconDots } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../../lib/apiClient';
+import { PURPOSES, months, rub } from '../../lib/format';
+import type { Purpose, Recommendation } from '../../lib/types';
+import { useApplicationStore } from '../../store/applicationStore';
 
-// Цели кредита (плитки)
-const LOAN_PURPOSES = [
-  { id: 'working-capital', label: 'Пополнение оборотных средств', icon: '💰' },
-  { id: 'equipment', label: 'Покупка оборудования', icon: '️' },
-  { id: 'expansion', label: 'Расширение бизнеса', icon: '📈' },
-  { id: 'refinancing', label: 'Рефинансирование', icon: '🔄' },
-  { id: 'inventory', label: 'Закупка товара', icon: '📦' },
-  { id: 'other', label: 'Другое', icon: '📋' },
-];
+const ICONS: Record<Purpose, { icon: typeof IconWallet; color: string }> = {
+  CASH_GAP: { icon: IconWallet, color: '#1971c2' },
+  WORKING_CAPITAL: { icon: IconPackage, color: '#c92a2a' },
+  EQUIPMENT: { icon: IconTools, color: '#2b8a3e' },
+  OTHER: { icon: IconDots, color: '#862e9c' },
+};
 
 export function ProductSelectPage() {
   const navigate = useNavigate();
-  const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
-  const [amount, setAmount] = useState(1000000); // 1 млн рублей
-  const [term, setTerm] = useState(12); // 12 месяцев
+  const draft = useApplicationStore();
 
-  // Простой калькулятор платежа (аннуитет)
-  const calculatePayment = () => {
-    const annualRate = 0.15; // 15% годовых
-    const monthlyRate = annualRate / 12;
-    const payment = (amount * monthlyRate * Math.pow(1 + monthlyRate, term)) / 
-                    (Math.pow(1 + monthlyRate, term) - 1);
-    return Math.round(payment);
+  const [purpose, setPurpose] = useState<Purpose | null>(draft.purpose);
+  const [amount, setAmount] = useState<number>(draft.amountRub);
+  const [term, setTerm] = useState<number>(draft.term);
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Подбор продукта и расчёт платежа — на стороне банка, с небольшой задержкой после ввода
+  useEffect(() => {
+    if (!purpose || amount <= 0 || term <= 0) return;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      api.recommend(purpose, Math.round(amount * 100), Math.min(term, 60))
+        .then((r) => { setRecommendation(r); setError(null); })
+        .catch((e) => setError(e.message))
+        .finally(() => setLoading(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [purpose, amount, term]);
+
+  const product = recommendation?.recommended;
+  const adjusted = recommendation && (recommendation.amount !== Math.round(amount * 100) || recommendation.term !== term);
+
+  const handleContinue = () => {
+    if (!purpose || !recommendation) return;
+    // Если сумма или срок вне лимитов продукта, банк уже скорректировал их — продолжаем с ними
+    draft.setProduct(purpose, recommendation.amount / 100, recommendation.term, recommendation);
+    navigate('/client/company');
   };
-
-  const monthlyPayment = calculatePayment();
-  const overpayment = monthlyPayment * term - amount;
 
   return (
     <Container size="md" py={40}>
       <Title ta="center" mb={10}>
-        Для чего вам нужны деньги?
+        Для чего вам деньги?
       </Title>
       <Text c="dimmed" ta="center" mb={40}>
-        Выберите цель кредита, и мы подберём лучший продукт
+        Подберём продукт под вашу задачу и покажем примерный платёж
       </Text>
 
-      {/* Плитки целей */}
-      <SimpleGrid cols={3} spacing="lg" mb={40}>
-        {LOAN_PURPOSES.map((purpose) => (
-          <Card
-            key={purpose.id}
-            shadow="sm"
-            padding="lg"
-            radius="md"
-            withBorder
-            style={{
-              cursor: 'pointer',
-              border: selectedPurpose === purpose.id ? '2px solid #fa5252' : '1px solid #e9ecef',
-              backgroundColor: selectedPurpose === purpose.id ? '#fff5f5' : 'white',
-            }}
-            onClick={() => setSelectedPurpose(purpose.id)}
-          >
-            <Box ta="center">
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{purpose.icon}</div>
-              <Text size="sm" fw={500}>
-                {purpose.label}
-              </Text>
-            </Box>
-          </Card>
-        ))}
-      </SimpleGrid>
+      <Stack gap="md" mb={40}>
+        {PURPOSES.map((p) => {
+          const { icon: Icon, color } = ICONS[p.value];
+          const selected = purpose === p.value;
+          return (
+            <Card
+              key={p.value}
+              shadow="sm"
+              padding="xl"
+              radius="md"
+              withBorder
+              style={{
+                cursor: 'pointer',
+                border: selected ? '2px solid #EF3124' : '1px solid #dee2e6',
+                background: selected ? '#fff5f5' : 'white',
+                transition: 'all 0.2s ease',
+              }}
+              onClick={() => setPurpose(p.value)}
+            >
+              <Group>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 8,
+                    background: `${color}15`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon size={24} color={color} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Title order={5} mb={5}>{p.title}</Title>
+                  <Text size="sm" c="dimmed">{p.description}</Text>
+                </div>
+                {selected && <Badge color="red" size="lg">✓</Badge>}
+              </Group>
+            </Card>
+          );
+        })}
+      </Stack>
 
-      {/* Ползунки суммы и срока */}
-      <Paper shadow="sm" p="xl" radius="md" withBorder mb={40}>
-        <Stack gap="xl">
-          <div>
-            <Group justify="space-between" mb={5}>
-              <Text fw={500}>Сумма кредита</Text>
-              <Badge size="lg" color="red" variant="light">
-                {amount.toLocaleString('ru-RU')} ₽
-              </Badge>
-            </Group>
-            <Slider
-              min={100000}
-              max={10000000}
-              step={100000}
+      {purpose && (
+        <Paper shadow="sm" p="xl" radius="md" withBorder mb={40}>
+          <Title order={4} mb="lg">
+            Сколько и на какой срок
+          </Title>
+          <Group grow align="flex-start">
+            <NumberInput
+              label="Сумма"
               value={amount}
-              onChange={setAmount}
-              marks={[
-                { value: 1000000, label: '1 млн' },
-                { value: 5000000, label: '5 млн' },
-                { value: 10000000, label: '10 млн' },
-              ]}
+              onChange={(val) => setAmount(Number(val || 0))}
+              min={0}
+              step={50_000}
+              thousandSeparator=" "
+              suffix=" ₽"
+              description={product ? `${rub(product.minAmount)} – ${rub(product.maxAmount)}` : undefined}
             />
-          </div>
-
-          <div>
-            <Group justify="space-between" mb={5}>
-              <Text fw={500}>Срок кредита</Text>
-              <Badge size="lg" color="red" variant="light">
-                {term} мес.
-              </Badge>
-            </Group>
-            <Slider
-              min={3}
-              max={60}
-              step={1}
+            <NumberInput
+              label="Срок"
               value={term}
-              onChange={setTerm}
-              marks={[
-                { value: 12, label: '1 год' },
-                { value: 24, label: '2 года' },
-                { value: 36, label: '3 года' },
-                { value: 60, label: '5 лет' },
-              ]}
+              onChange={(val) => setTerm(Number(val || 0))}
+              min={1}
+              max={60}
+              suffix=" мес"
+              description={product ? `${product.minTerm}–${product.maxTerm} мес` : undefined}
             />
-          </div>
-        </Stack>
-      </Paper>
-
-      {/* Рекомендуемый продукт и калькулятор */}
-      <Paper shadow="sm" p="xl" radius="md" withBorder mb={40}>
-        <Title order={4} mb="md">
-          Рекомендуемый продукт
-        </Title>
-        <Card shadow="sm" padding="lg" radius="md" withBorder mb="lg">
-          <Group justify="space-between" align="center">
-            <div>
-              <Text fw={700} size="lg">
-                Бизнес-кредит
-              </Text>
-              <Text size="sm" c="dimmed">
-                Оптимально для вашей суммы и срока
-              </Text>
-            </div>
-            <Badge size="lg" color="green">
-              15% годовых
-            </Badge>
           </Group>
-        </Card>
 
-        <div style={{ borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
-          <Text fw={500} mb="sm">
-            Калькулятор платежа
-          </Text>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" c="dimmed">
-                Ежемесячный платёж
-              </Text>
-              <Text fw={700} size="xl" color="red">
-                {monthlyPayment.toLocaleString('ru-RU')} ₽
-              </Text>
-            </div>
-            <div>
-              <Text size="sm" c="dimmed">
-                Переплата
-              </Text>
-              <Text fw={700} size="xl">
-                {Math.round(overpayment / 1000).toLocaleString('ru-RU')} тыс. ₽
-              </Text>
-            </div>
-          </Group>
-        </div>
-      </Paper>
+          {error && <Alert color="red" mt="lg">{error}</Alert>}
 
-      {/* Кнопка продолжения */}
+          {recommendation && product && (
+            <Paper mt="xl" p="md" bg="#f8f9fa" radius="md">
+              <Group justify="space-between" align="flex-start">
+                <div>
+                  <Text size="sm" c="dimmed">Подходит продукт</Text>
+                  <Text fw={700} size="lg">{product.name}</Text>
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {rub(recommendation.amount)} на {months(recommendation.term)} · от {recommendation.rate}% годовых
+                  </Text>
+                  {recommendation.alternative && (
+                    <Text size="xs" c="dimmed" mt={4}>Ещё подойдёт: {recommendation.alternative.name}</Text>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <Text size="sm" c="dimmed">{product.annuity ? 'Примерный платёж' : 'Проценты в месяц'}</Text>
+                  <Group gap={6} justify="flex-end">
+                    {loading && <Loader size="xs" />}
+                    <Text fw={700} size="xl" c="red">{rub(recommendation.monthlyPayment)}</Text>
+                  </Group>
+                </div>
+              </Group>
+              {adjusted && (
+                <Alert color="yellow" mt="md" p="xs">
+                  У продукта «{product.name}» другие лимиты — посчитали для {rub(recommendation.amount)} на {months(recommendation.term)}
+                </Alert>
+              )}
+              <Text size="xs" c="dimmed" mt="sm">{recommendation.note}</Text>
+            </Paper>
+          )}
+        </Paper>
+      )}
+
       <Button
         fullWidth
         size="lg"
-        disabled={!selectedPurpose}
-        onClick={() => navigate('/client/company')}
+        disabled={!purpose || !recommendation || loading}
+        onClick={handleContinue}
+        color="red"
       >
         Продолжить
       </Button>

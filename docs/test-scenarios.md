@@ -11,6 +11,8 @@
 | Postman | сценарии T1–T13 по шагам: 79 запросов, 132 проверки ответов | `npx -y newman@6.2.1 run docs/postman/alfa-smart-credit.postman_collection.json` |
 | CI | на каждый PR: lint и модульные тесты, а отдельной задачей — сборка Docker-образов API и заглушки, smoke и Postman | GitHub Actions, файл `.github/workflows/ci.yml` |
 
+Через интерфейс те же сценарии (T1, T2, T3, T5, T6, T7, T8, T11) проходятся по шагам из [demo.md](demo.md): кабинет клиента и кабинет аналитика работают на том же API.
+
 Для smoke и Postman API и заглушка должны быть запущены, например `docker compose up --build postgres mock-external api`. Обе проверки создают новые заявки, поэтому их можно запускать повторно на той же базе.
 
 ### Postman вручную

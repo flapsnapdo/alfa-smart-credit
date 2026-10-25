@@ -28,18 +28,15 @@
 
 ### Фронтенд (`apps/web`)
 
-Версии — по PR фронтенда (#10); после его слияния таблица сверяется командой ниже.
-
 | Библиотека | Версия | Лицензия | Репозиторий |
 |---|---|---|---|
 | react | 18.3.1 | MIT | https://github.com/facebook/react |
 | react-dom | 18.3.1 | MIT | https://github.com/facebook/react |
 | react-router-dom | 6.30.6 | MIT | https://github.com/remix-run/react-router |
 | @mantine/core | 7.17.8 | MIT | https://github.com/mantinedev/mantine |
-| @mantine/form | 7.17.8 | MIT | https://github.com/mantinedev/mantine |
 | @mantine/hooks | 7.17.8 | MIT | https://github.com/mantinedev/mantine |
 | @tabler/icons-react | 3.49.0 | MIT | https://github.com/tabler/tabler-icons |
-| zustand | 5.0.15 | MIT | https://github.com/pmndrs/zustand |
+| zustand | 5.0.16 | MIT | https://github.com/pmndrs/zustand |
 
 ### Вместе с транзитивными зависимостями
 
@@ -47,7 +44,7 @@
 ```bash
 pnpm licenses list --prod
 ```
-На момент последней проверки — 220 пакетов, все под разрешительными лицензиями: MIT (196), ISC (10), BSD-3-Clause (8), Apache-2.0 (4), 0BSD (1), MIT OR CC0-1.0 (1).
+На момент последней проверки — 211 пакетов, все под разрешительными лицензиями: MIT (189), ISC (9), BSD-3-Clause (7), Apache-2.0 (4), 0BSD (1), MIT OR CC0-1.0 (1).
 
 Инструменты разработки и сборки (TypeScript, Vite, Vitest, drizzle-kit) в приложение не входят.
 
