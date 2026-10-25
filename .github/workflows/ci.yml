@@ -16,3 +16,32 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test
+
+  # Собираем Docker-образы, поднимаем API с базой и заглушкой и проверяем сценарии целиком
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PIPELINE_STEP_MS: 300   # на демо этапы идут медленнее (1500 мс), в CI ускоряем
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Собрать и запустить API, базу и заглушку
+        run: docker compose up --build --wait --wait-timeout 180 postgres mock-external api
+
+      - name: Smoke — 7 демо-компаний
+        run: node scripts/smoke.mjs
+
+      - name: Postman — сценарии T1–T13
+        run: npx -y newman@6.2.1 run docs/postman/alfa-smart-credit.postman_collection.json --reporter-cli-no-success-assertions
+
+      - name: Логи сервисов
+        if: failure()
+        run: docker compose logs --no-color postgres mock-external api
+
+      - name: Остановить
+        if: always()
+        run: docker compose down --volumes
