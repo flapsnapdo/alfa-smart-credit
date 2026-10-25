@@ -1,70 +1,106 @@
-
-```markdown
 # Машина состояний заявки
+
+Источник правды — таблица `TRANSITIONS` в [`apps/api/src/applications/status-machine.ts`](../apps/api/src/applications/status-machine.ts). Любой переход, которого нет в таблице, API отклоняет с ошибкой `409 INVALID_TRANSITION`. Каждый переход записывается в `application_status_history`: откуда, куда, кто и почему.
+
+Кто может выполнить переход:
+- **CLIENT** — клиент в своём кабинете;
+- **SYSTEM** — конвейер (проверка документов, запросы во внешние сервисы, скоринг);
+- **ANALYST** — аналитик банка.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT: CLIENT создает
-    DRAFT --> SUBMITTED: CLIENT отправляет
-    DRAFT --> CANCELLED: CLIENT отменяет
-    
-    SUBMITTED --> VALIDATION: SYSTEM проверка
-    SUBMITTED --> CANCELLED: CLIENT отменяет
-    
-    VALIDATION --> ENRICHMENT: SYSTEM данные собраны
-    VALIDATION --> INFO_REQUESTED: SYSTEM нужны доки
-    VALIDATION --> CANCELLED: CLIENT отменяет
-    
-    INFO_REQUESTED --> VALIDATION: CLIENT загрузил файл
-    INFO_REQUESTED --> CANCELLED: CLIENT отменяет
-    INFO_REQUESTED --> EXPIRED: SYSTEM таймаут
-    
-    ENRICHMENT --> SCORING: SYSTEM enrichment готов
-    ENRICHMENT --> REJECTED: SYSTEM стоп-фактор
-    ENRICHMENT --> MANUAL_REVIEW: SYSTEM нужна проверка
-    ENRICHMENT --> CANCELLED: CLIENT отменяет
-    
-    SCORING --> APPROVED: SYSTEM авто-одобрение
-    SCORING --> COUNTER_OFFER: SYSTEM контрпредложение
-    SCORING --> MANUAL_REVIEW: SYSTEM ручной обзор
-    SCORING --> REJECTED: SYSTEM авто-отказ
-    SCORING --> CANCELLED: CLIENT отменяет
-    
-    MANUAL_REVIEW --> APPROVED: ANALYST одобрил
-    MANUAL_REVIEW --> COUNTER_OFFER: ANALYST предложил иное
-    MANUAL_REVIEW --> REJECTED: ANALYST отказал
-    MANUAL_REVIEW --> INFO_REQUESTED: ANALYST запросил доки
-    MANUAL_REVIEW --> CANCELLED: CLIENT отменяет
-    
-    APPROVED --> SIGNING: CLIENT согласен
-    APPROVED --> CANCELLED: CLIENT отменяет
-    APPROVED --> EXPIRED: SYSTEM таймаут
-    
-    COUNTER_OFFER --> SIGNING: CLIENT принял условия
-    COUNTER_OFFER --> CANCELLED: CLIENT отменяет
-    COUNTER_OFFER --> EXPIRED: SYSTEM таймаут
-    
-    SIGNING --> ISSUED: SYSTEM выдача
+    [*] --> DRAFT : CLIENT создаёт заявку
+
+    DRAFT --> SUBMITTED : CLIENT отправляет с согласием на БКИ
+    SUBMITTED --> VALIDATION : SYSTEM начинает проверку
+
+    VALIDATION --> ENRICHMENT : SYSTEM документы в порядке
+    VALIDATION --> INFO_REQUESTED : SYSTEM не хватает документов
+    INFO_REQUESTED --> VALIDATION : CLIENT загрузил документы
+
+    ENRICHMENT --> SCORING : SYSTEM ответы реестра, ФНС и БКИ получены
+    ENRICHMENT --> MANUAL_REVIEW : SYSTEM внешний сервис не ответил
+    ENRICHMENT --> REJECTED : SYSTEM стоп-фактор
+
+    SCORING --> APPROVED : SYSTEM одобрено
+    SCORING --> COUNTER_OFFER : SYSTEM другие условия
+    SCORING --> MANUAL_REVIEW : SYSTEM нужен специалист
+    SCORING --> REJECTED : SYSTEM отказ
+
+    MANUAL_REVIEW --> APPROVED : ANALYST одобряет
+    MANUAL_REVIEW --> COUNTER_OFFER : ANALYST предлагает другие условия
+    MANUAL_REVIEW --> REJECTED : ANALYST отказывает
+    MANUAL_REVIEW --> INFO_REQUESTED : ANALYST запрашивает документ
+
+    APPROVED --> SIGNING : CLIENT принимает предложение
+    COUNTER_OFFER --> SIGNING : CLIENT выбирает вариант
+    SIGNING --> ISSUED : CLIENT вводит код, деньги зачислены
+
     ISSUED --> [*]
     REJECTED --> [*]
-    CANCELLED --> [*]
-    EXPIRED --> [*]
+```
 
-## Тексты для клиента (из client-view.ts)
+На схеме — основной путь. Чтобы она читалась, на ней нет двух групп переходов (они есть в таблице ниже):
+- **отзыв клиентом → `CANCELLED`** — из любого незавершённого статуса до подписания: `DRAFT`, `SUBMITTED`, `VALIDATION`, `INFO_REQUESTED`, `ENRICHMENT`, `SCORING`, `MANUAL_REVIEW`, `APPROVED`, `COUNTER_OFFER`;
+- **истечение срока → `EXPIRED`** — из `INFO_REQUESTED`, `APPROVED`, `COUNTER_OFFER`.
 
-| Статус | Заголовок (title) | Текст (text) |
-| :--- | :--- | :--- |
-| DRAFT | Черновик сохранен | Проверьте данные и отправьте заявку на рассмотрение. |
-| SUBMITTED | Заявка отправлена | Идет первичная проверка документов... |
-| VALIDATION | Проверка данных | Запрашиваем информацию в реестрах и БКИ. |
-| INFO_REQUESTED | Требуются документы | Пожалуйста, загрузите запрошенные документы в личном кабинете. |
-| ENRICHMENT | Обогащение данных | Анализируем финансовую устойчивость компании. |
-| SCORING | Скоринг | Рассчитываем кредитный рейтинг и доступный лимит. |
-| MANUAL_REVIEW | Ручное рассмотрение | Заявка передана аналитику для принятия решения. |
-| APPROVED | Кредит одобрен! | Поздравляем! Перейдите к подписанию договора. |
-| COUNTER_OFFER | Индивидуальное предложение | Мы подготовили специальные условия. Ознакомьтесь и примите решение. |
-| SIGNING | Подписание договора | Введите код подтверждения для завершения сделки. |
-| ISSUED | Средства зачислены | Кредит успешно выдан на ваш расчетный счет. |
-| REJECTED | Отказ в кредите | К сожалению, мы не можем одобрить заявку. Смотрите причины в деталях. |
-| CANCELLED | Заявка отменена | Вы отозвали заявку на получение кредита. |
-| EXPIRED | Срок действия истек | Время на принятие решения или подписание истекло. |
+## Все переходы
+
+| Из статуса | В статус | Кто | Когда |
+|---|---|---|---|
+| DRAFT | SUBMITTED | CLIENT | клиент отправил заявку с согласием на запрос в БКИ |
+| DRAFT | CANCELLED | CLIENT | клиент отозвал черновик |
+| SUBMITTED | VALIDATION | SYSTEM | конвейер взял заявку в работу |
+| SUBMITTED | CANCELLED | CLIENT | клиент отозвал заявку |
+| VALIDATION | ENRICHMENT | SYSTEM | все обязательные документы есть |
+| VALIDATION | INFO_REQUESTED | SYSTEM | не хватает обязательного документа для продукта |
+| VALIDATION | CANCELLED | CLIENT | клиент отозвал заявку |
+| INFO_REQUESTED | VALIDATION | CLIENT, SYSTEM | клиент загрузил всё запрошенное — конвейер продолжает сам |
+| INFO_REQUESTED | CANCELLED | CLIENT | клиент отозвал заявку |
+| INFO_REQUESTED | EXPIRED | SYSTEM | документы не загружены вовремя |
+| ENRICHMENT | SCORING | SYSTEM | получены ответы реестра, ФНС и БКИ |
+| ENRICHMENT | REJECTED | SYSTEM | стоп-фактор из внешних данных |
+| ENRICHMENT | MANUAL_REVIEW | SYSTEM | внешний сервис не ответил — решает специалист |
+| ENRICHMENT | CANCELLED | CLIENT | клиент отозвал заявку |
+| SCORING | APPROVED | SYSTEM | авто-одобрение |
+| SCORING | COUNTER_OFFER | SYSTEM | запрошенную сумму дать нельзя, есть другие варианты |
+| SCORING | MANUAL_REVIEW | SYSTEM | рейтинг C или сумма выше лимита авто-решения |
+| SCORING | REJECTED | SYSTEM | стоп-фактор или рейтинг D |
+| SCORING | CANCELLED | CLIENT | клиент отозвал заявку |
+| MANUAL_REVIEW | APPROVED | ANALYST | аналитик одобрил (с комментарием) |
+| MANUAL_REVIEW | COUNTER_OFFER | ANALYST | аналитик предложил другие сумму или срок |
+| MANUAL_REVIEW | REJECTED | ANALYST | аналитик отказал, комментарий видит клиент |
+| MANUAL_REVIEW | INFO_REQUESTED | ANALYST | аналитик запросил документ |
+| MANUAL_REVIEW | CANCELLED | CLIENT | клиент отозвал заявку |
+| APPROVED | SIGNING | CLIENT | клиент принял предложение — создан договор |
+| APPROVED | CANCELLED | CLIENT | клиент отказался от предложения |
+| APPROVED | EXPIRED | SYSTEM | предложение не принято вовремя |
+| COUNTER_OFFER | SIGNING | CLIENT | клиент выбрал один из вариантов |
+| COUNTER_OFFER | CANCELLED | CLIENT | клиент отказался |
+| COUNTER_OFFER | EXPIRED | SYSTEM | предложение не принято вовремя |
+| SIGNING | ISSUED | CLIENT, SYSTEM | клиент подписал договор кодом, деньги зачислены |
+
+Финальные статусы — `ISSUED`, `REJECTED`, `CANCELLED`, `EXPIRED`: из них переходов нет.
+
+Переходы в `EXPIRED` заложены в модель, но автоматический таймер в прототипе не реализован.
+
+## Что видит клиент
+
+Тексты из [`apps/api/src/applications/client-view.ts`](../apps/api/src/applications/client-view.ts). API отдаёт их в каждой заявке в поле `clientView`; `nextAction` подсказывает фронтенду, что показать дальше.
+
+| Статус | Заголовок (`title`) | Текст (`text`) | Следующее действие (`nextAction`) |
+|---|---|---|---|
+| DRAFT | Черновик | Заполните заявку и отправьте её на рассмотрение | FILL_DRAFT |
+| SUBMITTED | Заявка отправлена | Мы получили заявку и начинаем проверку | WAIT |
+| VALIDATION | Проверяем данные | Проверяем, что все данные заполнены верно | WAIT |
+| INFO_REQUESTED | Нужны документы | Загрузите запрошенный документ — заявка продолжится автоматически | UPLOAD_DOCUMENT |
+| ENRICHMENT | Проверяем компанию | Запрашиваем данные из реестра и кредитную историю | WAIT |
+| SCORING | Оцениваем заявку | Рассчитываем условия по вашей заявке | WAIT |
+| MANUAL_REVIEW | Заявку рассматривает специалист | Обычно это занимает до 1 рабочего дня | WAIT |
+| APPROVED | Одобрено | Подтвердите условия, чтобы перейти к подписанию | ACCEPT_OFFER |
+| COUNTER_OFFER | Предлагаем другие условия | Не можем одобрить всю сумму, но можем предложить другие условия | ACCEPT_OR_DECLINE_OFFER |
+| SIGNING | Подписание договора | Проверьте договор и подтвердите его кодом | SIGN |
+| ISSUED | Средства выданы | Деньги зачислены на ваш счёт | NONE |
+| REJECTED | Отказ | К сожалению, сейчас мы не можем выдать кредит | NONE |
+| CANCELLED | Заявка отозвана | Заявка закрыта по вашему решению | NONE |
+| EXPIRED | Срок истёк | Мы не получили ответ вовремя, заявка закрыта | NONE |
