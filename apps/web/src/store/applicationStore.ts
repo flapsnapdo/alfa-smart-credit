@@ -1,54 +1,31 @@
 import { create } from 'zustand';
+import type { Purpose, Recommendation } from '../lib/types';
 
-interface ApplicationData {
-  purpose: string | null;
-  amount: number;
+/** Черновик новой заявки, пока клиент идёт по шагам: цель → компания → проверка и отправка */
+interface DraftState {
+  purpose: Purpose | null;
+  amountRub: number;
   term: number;
-  rate: number;
-  monthlyPayment: number;
-  company: any;
-  financials: any;
-  bkiConsent: boolean;
-  applicationId: string | null;
-  applicationNumber: string | null;
-}
-
-interface ApplicationStore extends ApplicationData {
-  setProductData: (purpose: string, amount: number, term: number, rate: number, monthlyPayment: number) => void;
-  setCompany: (company: any) => void;
-  setFinancials: (financials: any) => void;
-  setBkiConsent: (consent: boolean) => void;
-  setApplication: (id: string, number: string) => void;
+  recommendation: Recommendation | null;
+  companyId: string | null;
+  companyName: string | null;
+  setProduct: (purpose: Purpose, amountRub: number, term: number, recommendation: Recommendation) => void;
+  setCompany: (companyId: string, companyName: string) => void;
   reset: () => void;
 }
 
-const initialState: ApplicationData = {
+const initial = {
   purpose: null,
-  amount: 0,
-  term: 0,
-  rate: 0,
-  monthlyPayment: 0,
-  company: null,
-  financials: null,
-  bkiConsent: false,
-  applicationId: null,
-  applicationNumber: null,
+  amountRub: 1_500_000,
+  term: 24,
+  recommendation: null,
+  companyId: null,
+  companyName: null,
 };
 
-export const useApplicationStore = create<ApplicationStore>((set) => ({
-  ...initialState,
-
-  setProductData: (purpose, amount, term, rate, monthlyPayment) =>
-    set({ purpose, amount, term, rate, monthlyPayment }),
-
-  setCompany: (company) => set({ company }),
-
-  setFinancials: (financials) => set({ financials }),
-
-  setBkiConsent: (bkiConsent) => set({ bkiConsent }),
-
-  setApplication: (applicationId, applicationNumber) =>
-    set({ applicationId, applicationNumber }),
-
-  reset: () => set(initialState),
+export const useApplicationStore = create<DraftState>((set) => ({
+  ...initial,
+  setProduct: (purpose, amountRub, term, recommendation) => set({ purpose, amountRub, term, recommendation }),
+  setCompany: (companyId, companyName) => set({ companyId, companyName }),
+  reset: () => set(initial),
 }));

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Container,
   Title,
@@ -13,37 +13,50 @@ import {
   Paper,
   PinInput,
   Box,
+  Loader,
 } from '@mantine/core';
-import { useNavigate } from 'react-router-dom';
-import { useApplicationStore } from '../../store/applicationStore';
 import { IconCheck } from '@tabler/icons-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { api } from '../../lib/apiClient';
+import { dateTime, months, rub } from '../../lib/format';
+import type { Contract } from '../../lib/types';
 
 export function SigningPage() {
   const navigate = useNavigate();
+  const { id = '' } = useParams();
+  const [contract, setContract] = useState<Contract | null>(null);
   const [code, setCode] = useState('');
-  const [signed, setSigned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { amount, term, rate, monthlyPayment, applicationNumber } = useApplicationStore();
+  useEffect(() => {
+    api.contract(id).then(setContract).catch((e) => setError(e.message));
+  }, [id]);
 
-  const handleSign = () => {
-    if (code.length !== 6) {
-      setError('Введите 6-значный код');
-      return;
-    }
-
+  const handleSign = async () => {
     setLoading(true);
     setError(null);
-
-    // Имитация подписания
-    setTimeout(() => {
-      setSigned(true);
+    try {
+      setContract(await api.sign(id, code));
+    } catch (e) {
+      setError((e as Error).message);
+      setCode('');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
-  if (signed) {
+  if (!contract) {
+    return (
+      <Container size="md" py={40}>
+        {error ? <Alert color="red">{error}</Alert> : <Group justify="center"><Loader /></Group>}
+      </Container>
+    );
+  }
+
+  const { offer } = contract;
+
+  if (contract.status === 'ISSUED') {
     return (
       <Container size="md" py={40}>
         <Card shadow="sm" padding="xl" radius="md" withBorder ta="center">
@@ -62,37 +75,22 @@ export function SigningPage() {
             <IconCheck size={40} color="#2b8a3e" />
           </div>
           <Title order={3} mb={10} style={{ color: '#2b8a3e' }}>
-            Договор подписан!
-            </Title>
+            Средства выданы
+          </Title>
           <Text c="dimmed" mb="xl">
-            Договор №{applicationNumber || 'ЗК-2026-000123'} от {new Date().toLocaleDateString('ru-RU')}
+            Договор {contract.number}{contract.signedAt ? ` подписан ${dateTime(contract.signedAt)}` : ''}
           </Text>
 
           <Paper p="md" bg="#f8f9fa" radius="md" mb="xl">
-            <Text size="sm" c="dimmed" mb="xs">
-              Сумма кредита
-            </Text>
-            <Text fw={700} size="xl" color="red">
-              {amount.toLocaleString('ru-RU')} ₽
-            </Text>
+            <Text size="sm" c="dimmed" mb="xs">Зачислено на счёт</Text>
+            <Text fw={700} size="xl" c="red">{rub(offer.amount)}</Text>
             <Text size="sm" c="dimmed" mt="xs">
-              Срок: {term} месяцев • Ставка: {rate}%
+              Срок: {months(offer.term)} • Ставка: {offer.rate}% • Платёж: {rub(offer.monthlyPayment)}/мес
             </Text>
+            {contract.payoutId && <Text size="xs" c="dimmed" mt="xs">Номер операции: {contract.payoutId}</Text>}
           </Paper>
 
-          <Alert color="blue" mb="xl">
-            <Text size="sm">
-              Деньги будут перечислены на расчётный счёт в течение 1-2 рабочих дней.
-              Мы отправим уведомление на вашу почту.
-            </Text>
-          </Alert>
-
-          <Button
-            size="lg"
-            color="red"
-            onClick={() => navigate('/client/dashboard')}
-            fullWidth
-          >
+          <Button size="lg" color="red" onClick={() => navigate('/client/dashboard')} fullWidth>
             Перейти в кабинет
           </Button>
         </Card>
@@ -106,97 +104,64 @@ export function SigningPage() {
         Подписание договора
       </Title>
       <Text c="dimmed" ta="center" mb={40}>
-        Введите код из СМС для подписания договора
+        Проверьте условия и подтвердите договор кодом
       </Text>
 
       {error && (
-        <Alert color="red" mb="lg" onClose={() => setError(null)}>
+        <Alert color="red" mb="lg" onClose={() => setError(null)} withCloseButton>
           {error}
         </Alert>
       )}
 
       <Card shadow="sm" padding="xl" radius="md" withBorder mb={40}>
-        <Title order={4} mb="md">
-          Договор №{applicationNumber || 'ЗК-2026-000123'}
-        </Title>
-
+        <Title order={4} mb="md">Договор {contract.number}</Title>
         <Stack gap="sm" mb="lg">
           <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Сумма
-            </Text>
-            <Text fw={600}>
-              {amount.toLocaleString('ru-RU')} ₽
-            </Text>
+            <Text size="sm" c="dimmed">Сумма</Text>
+            <Text fw={600}>{rub(offer.amount)}</Text>
           </Group>
           <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Срок
-            </Text>
-            <Text fw={600}>{term} месяцев</Text>
+            <Text size="sm" c="dimmed">Срок</Text>
+            <Text fw={600}>{months(offer.term)}</Text>
           </Group>
           <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Ставка
-            </Text>
-            <Badge color="green">{rate}% годовых</Badge>
+            <Text size="sm" c="dimmed">Ставка</Text>
+            <Badge color="green">{offer.rate}% годовых</Badge>
           </Group>
           <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              Платёж
-            </Text>
-            <Text fw={700}>
-              {monthlyPayment.toLocaleString('ru-RU')} ₽/мес
-            </Text>
+            <Text size="sm" c="dimmed">Платёж</Text>
+            <Text fw={700}>{rub(offer.monthlyPayment)}/мес</Text>
           </Group>
         </Stack>
 
         <Divider mb="lg" />
 
-        <Paper p="md" bg="#fff5f5" radius="md">
-          <Text size="sm" fw={600} mb="xs">
-            Код отправлен на +7 (9**) ***-**-12
-          </Text>
-          <Text size="xs" c="dimmed">
-            Код действителен в течение 10 минут
-          </Text>
-        </Paper>
+        {contract.demoSignCode && (
+          <Paper p="md" bg="#fff5f5" radius="md">
+            <Text size="sm" fw={600}>
+              Код для подписи: <Text span fw={800} size="lg" c="red">{contract.demoSignCode}</Text>
+            </Text>
+            <Text size="xs" c="dimmed" mt={4}>
+              По условиям демо код показываем прямо в кабинете. В настоящем банке он пришёл бы в приложение или по СМС.
+            </Text>
+          </Paper>
+        )}
       </Card>
 
       <Card shadow="sm" padding="xl" radius="md" withBorder mb={40} ta="center">
-        <Text fw={600} mb="md">
-          Введите код подтверждения
-        </Text>
-        <Box mb="md">
-          <PinInput
-            length={6}
-            value={code}
-            onChange={setCode}
-            type="number"
-            placeholder="○"
-            size="lg"
-            style={{ justifyContent: 'center' }}
-          />
+        <Text fw={600} mb="md">Введите код подтверждения</Text>
+        <Box mb="md" style={{ display: 'flex', justifyContent: 'center' }}>
+          <PinInput length={4} value={code} onChange={setCode} type="number" placeholder="○" size="lg" />
         </Box>
-        <Text size="xs" c="dimmed">
-          Для демонстрации введите любые 6 цифр
-        </Text>
       </Card>
 
-      <Button
-        size="lg"
-        color="red"
-        onClick={handleSign}
-        loading={loading}
-        disabled={code.length !== 6}
-        fullWidth
-      >
+      <Button size="lg" color="red" onClick={handleSign} loading={loading} disabled={code.length !== 4} fullWidth>
         Подписать договор
       </Button>
 
       <Group justify="center" mt="md">
-        <Button variant="subtle" onClick={() => navigate('/client/offer')}>
-          Назад к оферте
+        <Button variant="subtle" onClick={() => navigate(`/client/applications/${id}`)}>
+          К статусу заявки
         </Button>
       </Group>
     </Container>

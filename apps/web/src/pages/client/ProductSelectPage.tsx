@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Container,
   Title,
@@ -10,216 +10,175 @@ import {
   NumberInput,
   Badge,
   Paper,
+  Alert,
+  Loader,
 } from '@mantine/core';
-import { IconWallet, IconTools, IconChartBar, IconRefresh, IconPackage } from '@tabler/icons-react';
+import { IconWallet, IconTools, IconPackage, IconDots } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../../lib/apiClient';
+import { PURPOSES, months, rub } from '../../lib/format';
+import type { Purpose, Recommendation } from '../../lib/types';
 import { useApplicationStore } from '../../store/applicationStore';
 
-const products = [
-  {
-    code: 'working-capital',
-    title: 'Пополнение оборотных средств',
-    description: 'Для текущих бизнес-задач и операционной деятельности',
-    icon: IconWallet,
-    color: '#1971c2',
-    rate: 'от 18%',
-    amount: 'до 1 млрд ₽',
-    term: '3–24 мес',
-  },
-  {
-    code: 'equipment',
-    title: 'Покупка оборудования',
-    description: 'Для модернизации производства и покупки техники',
-    icon: IconTools,
-    color: '#2b8a3e',
-    rate: 'от 15%',
-    amount: 'до 5 млрд ₽',
-    term: '12–60 мес',
-  },
-  {
-    code: 'expansion',
-    title: 'Расширение бизнеса',
-    description: 'Для роста, масштабирования и выхода на новые рынки',
-    icon: IconChartBar,
-    color: '#f08c00',
-    rate: 'от 16%',
-    amount: 'до 3 млрд ₽',
-    term: '6–36 мес',
-  },
-  {
-    code: 'refinancing',
-    title: 'Рефинансирование',
-    description: 'Объединение существующих кредитов в один',
-    icon: IconRefresh,
-    color: '#862e9c',
-    rate: 'от 14%',
-    amount: 'до 2 млрд ₽',
-    term: '12–48 мес',
-  },
-  {
-    code: 'inventory',
-    title: 'Закупка товара',
-    description: 'Финансирование закупки сырья и товаров',
-    icon: IconPackage,
-    color: '#c92a2a',
-    rate: 'от 17%',
-    amount: 'до 500 млн ₽',
-    term: '3–18 мес',
-  },
-];
+const ICONS: Record<Purpose, { icon: typeof IconWallet; color: string }> = {
+  CASH_GAP: { icon: IconWallet, color: '#1971c2' },
+  WORKING_CAPITAL: { icon: IconPackage, color: '#c92a2a' },
+  EQUIPMENT: { icon: IconTools, color: '#2b8a3e' },
+  OTHER: { icon: IconDots, color: '#862e9c' },
+};
 
 export function ProductSelectPage() {
   const navigate = useNavigate();
-  const setProductData = useApplicationStore((s) => s.setProductData);
+  const draft = useApplicationStore();
 
-  const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
-  const [amount, setAmount] = useState<number>(5000000);
-  const [term, setTerm] = useState<number>(12);
+  const [purpose, setPurpose] = useState<Purpose | null>(draft.purpose);
+  const [amount, setAmount] = useState<number>(draft.amountRub);
+  const [term, setTerm] = useState<number>(draft.term);
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const monthlyPayment = Math.round((amount * (1 + 0.18 * (term / 12))) / term);
+  // Подбор продукта и расчёт платежа — на стороне банка, с небольшой задержкой после ввода
+  useEffect(() => {
+    if (!purpose || amount <= 0 || term <= 0) return;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      api.recommend(purpose, Math.round(amount * 100), Math.min(term, 60))
+        .then((r) => { setRecommendation(r); setError(null); })
+        .catch((e) => setError(e.message))
+        .finally(() => setLoading(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [purpose, amount, term]);
+
+  const product = recommendation?.recommended;
+  const adjusted = recommendation && (recommendation.amount !== Math.round(amount * 100) || recommendation.term !== term);
 
   const handleContinue = () => {
-    if (!selectedPurpose) return;
-    setProductData(selectedPurpose, amount, term, 18, monthlyPayment);
+    if (!purpose || !recommendation) return;
+    // Если сумма или срок вне лимитов продукта, банк уже скорректировал их — продолжаем с ними
+    draft.setProduct(purpose, recommendation.amount / 100, recommendation.term, recommendation);
     navigate('/client/company');
   };
 
   return (
     <Container size="md" py={40}>
       <Title ta="center" mb={10}>
-        Выберите цель кредита
+        Для чего вам деньги?
       </Title>
       <Text c="dimmed" ta="center" mb={40}>
-        Подберём лучший продукт под ваши задачи
+        Подберём продукт под вашу задачу и покажем примерный платёж
       </Text>
-        <Paper shadow="sm" p="xl" radius="md" mb={40} withBorder>
-          <Group>
-            <div style={{ flex: 1 }}>
-              <Title order={3} mb={5}>Добро пожаловать!</Title>
-              <Text size="sm" c="dimmed">
-                Выберите цель кредита, и мы подберём лучшие условия для вашего бизнеса
-              </Text>
-            </div>
-            <div style={{ fontSize: 48, opacity: 0.3 }}>💼</div>
-          </Group>
-        </Paper>
+
       <Stack gap="md" mb={40}>
-        {products.map((product) => {
-          const Icon = product.icon;
+        {PURPOSES.map((p) => {
+          const { icon: Icon, color } = ICONS[p.value];
+          const selected = purpose === p.value;
           return (
             <Card
-              key={product.code}
+              key={p.value}
               shadow="sm"
               padding="xl"
               radius="md"
               withBorder
               style={{
                 cursor: 'pointer',
-                border:
-                  selectedPurpose === product.code
-                    ? '2px solid #EF3124'
-                    : '1px solid #dee2e6',
-                background:
-                  selectedPurpose === product.code ? '#fff5f5' : 'white',
+                border: selected ? '2px solid #EF3124' : '1px solid #dee2e6',
+                background: selected ? '#fff5f5' : 'white',
                 transition: 'all 0.2s ease',
               }}
-              onClick={() => setSelectedPurpose(product.code)}
+              onClick={() => setPurpose(p.value)}
             >
               <Group>
-                  <Group mt="md" gap="xs">
-    <Badge variant="light" color={product.color} size="sm">
-      {product.rate}
-    </Badge>
-    <Badge variant="light" color={product.color} size="sm">
-      {product.amount}
-    </Badge>
-    <Badge variant="light" color={product.color} size="sm">
-      {product.term}
-    </Badge>
-  </Group>
                 <div
                   style={{
                     width: 48,
                     height: 48,
                     borderRadius: 8,
-                    background: `${product.color}15`,
+                    background: `${color}15`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Icon size={24} color={product.color} />
+                  <Icon size={24} color={color} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <Title order={5} mb={5}>
-                    {product.title}
-                  </Title>
-                  <Text size="sm" c="dimmed">
-                    {product.description}
-                  </Text>
+                  <Title order={5} mb={5}>{p.title}</Title>
+                  <Text size="sm" c="dimmed">{p.description}</Text>
                 </div>
-                {selectedPurpose === product.code && (
-                  <Badge color="red" size="lg">
-                    ✓
-                  </Badge>
-                )}
+                {selected && <Badge color="red" size="lg">✓</Badge>}
               </Group>
             </Card>
           );
         })}
       </Stack>
 
-      {selectedPurpose && (
+      {purpose && (
         <Paper shadow="sm" p="xl" radius="md" withBorder mb={40}>
           <Title order={4} mb="lg">
-            Параметры кредита
+            Сколько и на какой срок
           </Title>
-          <Stack>
+          <Group grow align="flex-start">
             <NumberInput
-              label="Сумма кредита"
-              placeholder="Введите сумму"
+              label="Сумма"
               value={amount}
               onChange={(val) => setAmount(Number(val || 0))}
-              min={100000}
-              max={1000000000}
+              min={0}
+              step={50_000}
               thousandSeparator=" "
               suffix=" ₽"
-              required
+              description={product ? `${rub(product.minAmount)} – ${rub(product.maxAmount)}` : undefined}
             />
             <NumberInput
-              label="Срок кредита"
-              placeholder="Введите срок"
+              label="Срок"
               value={term}
               onChange={(val) => setTerm(Number(val || 0))}
-              min={3}
+              min={1}
               max={60}
               suffix=" мес"
-              required
+              description={product ? `${product.minTerm}–${product.maxTerm} мес` : undefined}
             />
-          </Stack>
+          </Group>
 
-          <Paper mt="xl" p="md" bg="#f8f9fa" radius="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed">
-                  Примерный платёж
-                </Text>
-                <Text fw={700} size="xl" color="red">
-                  {monthlyPayment.toLocaleString('ru-RU')} ₽/мес
-                </Text>
-              </div>
-              <Text size="sm" c="dimmed">
-                Ставка от 18% годовых
-              </Text>
-            </Group>
-          </Paper>
+          {error && <Alert color="red" mt="lg">{error}</Alert>}
+
+          {recommendation && product && (
+            <Paper mt="xl" p="md" bg="#f8f9fa" radius="md">
+              <Group justify="space-between" align="flex-start">
+                <div>
+                  <Text size="sm" c="dimmed">Подходит продукт</Text>
+                  <Text fw={700} size="lg">{product.name}</Text>
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {rub(recommendation.amount)} на {months(recommendation.term)} · от {recommendation.rate}% годовых
+                  </Text>
+                  {recommendation.alternative && (
+                    <Text size="xs" c="dimmed" mt={4}>Ещё подойдёт: {recommendation.alternative.name}</Text>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <Text size="sm" c="dimmed">{product.annuity ? 'Примерный платёж' : 'Проценты в месяц'}</Text>
+                  <Group gap={6} justify="flex-end">
+                    {loading && <Loader size="xs" />}
+                    <Text fw={700} size="xl" c="red">{rub(recommendation.monthlyPayment)}</Text>
+                  </Group>
+                </div>
+              </Group>
+              {adjusted && (
+                <Alert color="yellow" mt="md" p="xs">
+                  У продукта «{product.name}» другие лимиты — посчитали для {rub(recommendation.amount)} на {months(recommendation.term)}
+                </Alert>
+              )}
+              <Text size="xs" c="dimmed" mt="sm">{recommendation.note}</Text>
+            </Paper>
+          )}
         </Paper>
       )}
 
       <Button
         fullWidth
         size="lg"
-        disabled={!selectedPurpose || amount < 100000 || term < 3}
+        disabled={!purpose || !recommendation || loading}
         onClick={handleContinue}
         color="red"
       >

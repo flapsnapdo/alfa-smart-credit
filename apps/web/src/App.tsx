@@ -2,11 +2,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/client/LoginPage';
 import { ProductSelectPage } from './pages/client/ProductSelectPage';
 import { CompanyPage } from './pages/client/CompanyPage';
-import { FinancialsPage } from './pages/client/FinancialPage';
 import { ReviewPage } from './pages/client/ReviewPage';
 import { StatusPage } from './pages/client/StatusPage';
 import { ApplicationsPage } from './pages/client/ApplicationsPage';
-import { ClientLayout } from './components/ClientLayout';
+import { AnalystLayout, ClientLayout } from './components/ClientLayout';
 import { DocumentsPage } from './pages/client/DocumentsPage';
 import { OfferPage } from './pages/client/OfferPage';
 import { SigningPage } from './pages/client/SigningPage';
@@ -19,22 +18,27 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      
+
+      {/* Кабинет клиента: К2 мои заявки → К3 продукт → К4 компания → К6 проверка → К7–К9 статус, документы, предложение, подпись */}
       <Route element={<ClientLayout />}>
+        <Route path="/client/dashboard" element={<ApplicationsPage />} />
         <Route path="/client/product-select" element={<ProductSelectPage />} />
         <Route path="/client/company" element={<CompanyPage />} />
-        <Route path="/client/financials" element={<FinancialsPage />} />
         <Route path="/client/review" element={<ReviewPage />} />
-        <Route path="/client/status" element={<StatusPage />} />
-        <Route path="/client/dashboard" element={<ApplicationsPage />} />
-        <Route path="/client/documents" element={<DocumentsPage />} />
-        <Route path="/client/offer" element={<OfferPage />} />
-        <Route path="/client/signing" element={<SigningPage />} />
+        <Route path="/client/applications/:id" element={<StatusPage />} />
+        <Route path="/client/applications/:id/documents" element={<DocumentsPage />} />
+        <Route path="/client/applications/:id/offer" element={<OfferPage />} />
+        <Route path="/client/applications/:id/signing" element={<SigningPage />} />
       </Route>
 
-     <Route path="/analyst/dashboard" element={<A1 />} />
-<Route path="/analyst/application/:id" element={<A2 />} />
-<Route path="/analyst/application/:id/decision" element={<A3 />} />
+      {/* Кабинет аналитика: А1 очередь → А2 карточка → А3 решение */}
+      <Route element={<AnalystLayout />}>
+        <Route path="/analyst/dashboard" element={<A1 />} />
+        <Route path="/analyst/application/:id" element={<A2 />} />
+        <Route path="/analyst/application/:id/decision" element={<A3 />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

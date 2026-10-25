@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Container,
   Title,
@@ -10,163 +10,151 @@ import {
   FileInput,
   Alert,
   Badge,
-  Progress,
+  Loader,
 } from '@mantine/core';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { IconUpload, IconFileCheck, IconFile } from '@tabler/icons-react';
+import { api } from '../../lib/apiClient';
+import { DOC_TYPES, dateTime } from '../../lib/format';
+import type { Application, DocType, DocumentsInfo } from '../../lib/types';
 
-interface Document {
-  id: string;
-  name: string;
-  description: string;
-  required: boolean;
-  file: File | null;
-  uploaded: boolean;
+function docLabel(docType: DocType): string {
+  return DOC_TYPES.find((d) => d.value === docType)?.label ?? docType;
 }
 
 export function DocumentsPage() {
   const navigate = useNavigate();
-  const [documents, setDocuments] = useState<Document[]>([
-    {
-      id: 'passport',
-      name: 'Паспорт директора',
-      description: 'Скан главной страницы и страницы с пропиской',
-      required: true,
-      file: null,
-      uploaded: false,
-    },
-    {
-      id: 'egrul',
-      name: 'Выписка из ЕГРЮЛ',
-      description: 'Актуальная выписка (не старше 30 дней)',
-      required: true,
-      file: null,
-      uploaded: false,
-    },
-    {
-      id: 'financials',
-      name: 'Финансовая отчётность',
-      description: 'Бухгалтерский баланс за последний год',
-      required: true,
-      file: null,
-      uploaded: false,
-    },
-    {
-      id: 'contracts',
-      name: 'Договоры с контрагентами',
-      description: 'Основные действующие договоры (опционально)',
-      required: false,
-      file: null,
-      uploaded: false,
-    },
-  ]);
+  const { id = '' } = useParams();
+  const [app, setApp] = useState<Application | null>(null);
+  const [info, setInfo] = useState<DocumentsInfo | null>(null);
+  const [files, setFiles] = useState<Partial<Record<DocType, File | null>>>({});
+  const [uploading, setUploading] = useState<DocType | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleFileUpload = (id: string, file: File | null) => {
-    setDocuments((docs) =>
-      docs.map((doc) =>
-        doc.id === id ? { ...doc, file, uploaded: !!file } : doc
-      )
-    );
+  const load = useCallback(async () => {
+    try {
+      const [a, i] = await Promise.all([api.application(id), api.documents(id)]);
+      setApp(a);
+      setInfo(i);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const upload = async (docType: DocType) => {
+    const file = files[docType];
+    if (!file) return;
+    setUploading(docType);
+    setError(null);
+    try {
+      const { missing } = await api.uploadDocument(id, docType, file);
+      setFiles((f) => ({ ...f, [docType]: null }));
+      // Загружено всё, что просил банк, — заявка продолжается сама, возвращаемся к статусу
+      if (missing.length === 0 && app?.status === 'INFO_REQUESTED') {
+        navigate(`/client/applications/${id}`);
+        return;
+      }
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(null);
+    }
   };
 
-  const allRequiredUploaded = documents
-    .filter((d) => d.required)
-    .every((d) => d.uploaded);
+  if (!info || !app) {
+    return (
+      <Container size="md" py={40}>
+        {error ? <Alert color="red">{error}</Alert> : <Group justify="center"><Loader /></Group>}
+      </Container>
+    );
+  }
 
-  const uploadedCount = documents.filter((d) => d.uploaded).length;
-  const progress = (uploadedCount / documents.length) * 100;
+  const canUpload = app.status === 'DRAFT' || app.status === 'INFO_REQUESTED';
 
   return (
     <Container size="md" py={40}>
-      <Title ta="center" mb={10}>Загрузка документов</Title>
+      <Title ta="center" mb={10}>Документы</Title>
       <Text c="dimmed" ta="center" mb={40}>
-        Загрузите необходимые документы для рассмотрения заявки
+        Заявка {app.number} · {app.company.name}
       </Text>
 
-      <Card shadow="sm" padding="xl" radius="md" withBorder mb={40}>
-        <Group justify="space-between" mb="md">
-          <Text fw={600}>Прогресс загрузки</Text>
-          <Badge color="blue">
-            {uploadedCount} / {documents.length}
-          </Badge>
-        </Group>
-        <Progress value={progress} color="red" size="lg" />
-      </Card>
+      {error && <Alert color="red" mb="lg" onClose={() => setError(null)} withCloseButton>{error}</Alert>}
 
-      <Stack gap="md" mb={40}>
-        {documents.map((doc) => (
-          <Card
-            key={doc.id}
-            shadow="sm"
-            padding="lg"
-            radius="md"
-            withBorder
-            style={{
-              border: doc.uploaded ? '2px solid #2b8a3e' : '1px solid #dee2e6',
-              background: doc.uploaded ? '#f8f9fa' : 'white',
-            }}
-          >
-            <Group align="flex-start">
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 8,
-                  background: doc.uploaded ? '#d3f9d8' : '#f1f3f5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {doc.uploaded ? (
-                  <IconFileCheck size={24} color="#2b8a3e" />
-                ) : (
+      {info.missing.length > 0 ? (
+        <Stack gap="md" mb={40}>
+          <Text fw={600}>Банк просит загрузить</Text>
+          {info.missing.map((m) => (
+            <Card key={m.docType} shadow="sm" padding="lg" radius="md" withBorder>
+              <Group align="flex-start" wrap="nowrap">
+                <div style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 8, background: '#f1f3f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <IconFile size={24} color="#868e96" />
-                )}
-              </div>
-              <div style={{ flex: 1 }}>
-                <Group mb={5}>
-                  <Title order={5}>{doc.name}</Title>
-                  {doc.required && <Badge color="red">Обязательно</Badge>}
-                </Group>
-                <Text size="sm" c="dimmed" mb="md">
-                  {doc.description}
-                </Text>
-                <FileInput
-                  placeholder={doc.uploaded ? doc.file?.name : 'Выберите файл'}
-                  value={doc.file}
-                  onChange={(file) => handleFileUpload(doc.id, file)}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  leftSection={<IconUpload size={16} />}
-                  size="sm"
-                />
-              </div>
-            </Group>
-          </Card>
-        ))}
-      </Stack>
-
-      {allRequiredUploaded && (
-        <Alert color="green" mb="lg" title="Все обязательные документы загружены">
-          Можете переходить к следующему шагу
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Group mb={5}>
+                    <Title order={5}>{m.title}</Title>
+                    <Badge color="red">Обязательно</Badge>
+                  </Group>
+                  {m.comment && <Text size="sm" c="dimmed" mb="md">{m.comment}</Text>}
+                  {canUpload && (
+                    <Group align="flex-end">
+                      <FileInput
+                        style={{ flex: 1 }}
+                        placeholder="PDF, JPG или PNG до 10 МБ"
+                        value={files[m.docType] ?? null}
+                        onChange={(file) => setFiles((f) => ({ ...f, [m.docType]: file }))}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        leftSection={<IconUpload size={16} />}
+                        clearable
+                      />
+                      <Button
+                        color="red"
+                        disabled={!files[m.docType]}
+                        loading={uploading === m.docType}
+                        onClick={() => upload(m.docType)}
+                      >
+                        Загрузить
+                      </Button>
+                    </Group>
+                  )}
+                </div>
+              </Group>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+        <Alert color="green" mb={40} title="Все нужные документы загружены">
+          {app.status === 'INFO_REQUESTED' ? 'Заявка продолжает обработку.' : 'Банку больше ничего не нужно.'}
         </Alert>
       )}
 
-      <Group>
-        <Button
-          size="lg"
-          color="red"
-          onClick={() => navigate('/client/offer')}
-          disabled={!allRequiredUploaded}
-          style={{ flex: 1 }}
-        >
-          Перейти к оферте
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/client/status')}
-        >
-          Назад
+      {info.documents.length > 0 && (
+        <Card shadow="sm" padding="lg" radius="md" withBorder mb={40}>
+          <Text fw={600} mb="md">Загруженные документы</Text>
+          <Stack gap="sm">
+            {info.documents.map((doc) => (
+              <Group key={doc.id} justify="space-between">
+                <Group gap="sm">
+                  <IconFileCheck size={20} color="#2b8a3e" />
+                  <div>
+                    <Text size="sm" fw={500}>{docLabel(doc.docType)}</Text>
+                    <Text size="xs" c="dimmed">{doc.fileName} · {Math.ceil(doc.sizeBytes / 1024)} КБ · {dateTime(doc.createdAt)}</Text>
+                  </div>
+                </Group>
+                <Button size="xs" variant="subtle" onClick={() => api.openDocument(id, doc.id).catch((e) => setError(e.message))}>
+                  Открыть
+                </Button>
+              </Group>
+            ))}
+          </Stack>
+        </Card>
+      )}
+
+      <Group justify="center">
+        <Button variant="outline" onClick={() => navigate(`/client/applications/${id}`)}>
+          К статусу заявки
         </Button>
       </Group>
     </Container>

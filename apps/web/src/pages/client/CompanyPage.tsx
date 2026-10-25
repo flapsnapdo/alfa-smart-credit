@@ -1,225 +1,178 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Container,
   Title,
   Text,
-  Paper,
-  TextInput,
   Button,
   Group,
   Stack,
   Card,
   Badge,
   Divider,
-  Select,
   Alert,
+  Loader,
+  Radio,
+  SimpleGrid,
 } from '@mantine/core';
+import { IconCircleCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../../lib/apiClient';
+import { api } from '../../lib/apiClient';
+import type { Company, RegistryRecord } from '../../lib/types';
 import { useApplicationStore } from '../../store/applicationStore';
+
+const STATUS: Record<Company['status'], { label: string; color: string }> = {
+  ACTIVE: { label: 'Действующая', color: 'green' },
+  LIQUIDATING: { label: 'В процессе ликвидации', color: 'orange' },
+  LIQUIDATED: { label: 'Ликвидирована', color: 'red' },
+  BANKRUPT: { label: 'Банкротство', color: 'red' },
+};
+
+const POSITION: Record<Company['position'], string> = {
+  OWNER: 'владелец', CEO: 'руководитель', CFO: 'финансовый директор', ACCOUNTANT: 'бухгалтер', OTHER: 'сотрудник',
+};
 
 export function CompanyPage() {
   const navigate = useNavigate();
-  const [inn, setInn] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { purpose, companyId, setCompany } = useApplicationStore();
+  const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [selected, setSelected] = useState<string | null>(companyId);
+  const [registry, setRegistry] = useState<{ data?: RegistryRecord; error?: string; loading: boolean }>({ loading: false });
   const [error, setError] = useState<string | null>(null);
-  const [registryData, setRegistryData] = useState<any>(null);
-  const [manualMode, setManualMode] = useState(false);
-  const [formData, setFormData] = useState<any>({
-    inn: '',
-    type: 'LLC',
-    name: '',
-  });
-  const setCompany = useApplicationStore((s) => s.setCompany);
-  const handleSearch = async () => {
-    if (inn.length < 10) {
-      setError('ИНН должен содержать 10 или 12 цифр');
+
+  useEffect(() => {
+    if (!purpose) {
+      navigate('/client/product-select', { replace: true });
       return;
     }
+    api.me()
+      .then(({ companies }) => {
+        setCompanies(companies);
+        if (!selected && companies.length === 1) setSelected(companies[0].id);
+      })
+      .catch((e) => setError(e.message));
+  }, []);
 
-    setLoading(true);
-    setError(null);
+  const company = companies?.find((c) => c.id === selected) ?? null;
 
-    try {
-      const data = await apiClient.registry.lookup(inn);
-      setRegistryData(data);
-      setFormData({
-        inn: data.inn,
-        ogrn: data.ogrn,
-        type: data.type,
-        name: data.name,
-        okved: data.okved,
-        address: data.address,
-        directorName: data.directorName,
-      });
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при поиске компании');
-    } finally {
-      setLoading(false);
-    }
+  // Сверяем выбранную компанию с реестром ЕГРЮЛ/ЕГРИП (через заглушку)
+  useEffect(() => {
+    if (!company) return;
+    setRegistry({ loading: true });
+    api.registryLookup(company.inn)
+      .then((data) => setRegistry({ data, loading: false }))
+      .catch((e) => setRegistry({ error: e.message, loading: false }));
+  }, [company?.inn]);
+
+  const handleContinue = () => {
+    if (!company) return;
+    setCompany(company.id, company.name);
+    navigate('/client/review');
   };
-
-const handleUseRegistryData = async () => {
-  try {
-    const company = await apiClient.companies.create(formData);
-    setCompany(company);
-    navigate('/client/financials');
-  } catch (err: any) {
-    setError(err.message || 'Ошибка при сохранении компании');
-  }
-};
-const handleManualSubmit = async () => {
-  try {
-    const company = await apiClient.companies.create(formData);
-    setCompany(company);
-    navigate('/client/financials');
-  } catch (err: any) {
-    setError(err.message || 'Ошибка при сохранении компании');
-  }
-};
 
   return (
     <Container size="md" py={40}>
       <Title ta="center" mb={10}>
-        Данные компании
+        Компания
       </Title>
       <Text c="dimmed" ta="center" mb={40}>
-        Введите ИНН, и мы найдём данные вашей компании в реестре ЕГРЮЛ
+        {companies && companies.length > 1
+          ? 'Выберите компанию, для которой оформляете кредит'
+          : 'Проверьте данные компании'}
       </Text>
 
-      {error && (
-        <Alert color="red" mb="lg" onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert color="red" mb="lg">{error}</Alert>}
+      {!companies && !error && <Group justify="center"><Loader /></Group>}
 
-      {/* Поиск по ИНН */}
-      {!registryData && !manualMode && (
-        <Paper shadow="sm" p="xl" radius="md" withBorder mb={40}>
-          <Stack>
-            <TextInput
-              label="ИНН компании"
-              placeholder="Введите 10 или 12 цифр"
-              value={inn}
-              onChange={(e) => setInn(e.target.value)}
-              maxLength={12}
-              required
-            />
-            <Button onClick={handleSearch} loading={loading} disabled={inn.length < 10}>
-              Найти компанию
-            </Button>
+      {companies && (
+        <Radio.Group value={selected} onChange={setSelected}>
+          <Stack gap="md" mb={40}>
+            {companies.map((c) => (
+              <Card
+                key={c.id}
+                shadow="sm"
+                padding="lg"
+                radius="md"
+                withBorder
+                style={{
+                  cursor: 'pointer',
+                  border: selected === c.id ? '2px solid #EF3124' : '1px solid #dee2e6',
+                  background: selected === c.id ? '#fff5f5' : 'white',
+                }}
+                onClick={() => setSelected(c.id)}
+              >
+                <Group justify="space-between" wrap="nowrap">
+                  <Group wrap="nowrap">
+                    <Radio value={c.id} />
+                    <div>
+                      <Text fw={600}>{c.name}</Text>
+                      <Text size="sm" c="dimmed">ИНН {c.inn} · вы — {POSITION[c.position]}</Text>
+                    </div>
+                  </Group>
+                  <Badge color={STATUS[c.status].color}>{STATUS[c.status].label}</Badge>
+                </Group>
+              </Card>
+            ))}
           </Stack>
-        </Paper>
+        </Radio.Group>
       )}
 
-      {/* Карточка из реестра */}
-      {registryData && !manualMode && (
+      {company && (
         <Card shadow="sm" padding="xl" radius="md" withBorder mb={40}>
           <Group justify="space-between" mb="md">
-            <Title order={4}>Данные из реестра ЕГРЮЛ</Title>
-            <Badge color="green">{registryData.status}</Badge>
+            <Title order={4}>Данные из реестра</Title>
+            {registry.loading && <Loader size="sm" />}
+            {registry.data && (
+              <Badge color="green" leftSection={<IconCircleCheck size={14} />}>Сверено с ЕГРЮЛ/ЕГРИП</Badge>
+            )}
           </Group>
-
+          {registry.error && (
+            <Alert color="yellow" mb="md">
+              {registry.error}. Показываем данные, которые уже есть у банка.
+            </Alert>
+          )}
           <Stack gap="sm">
             <div>
               <Text size="sm" c="dimmed">Название</Text>
-              <Text fw={500}>{registryData.name}</Text>
+              <Text fw={500}>{company.name}</Text>
             </div>
             <Divider />
+            <SimpleGrid cols={2}>
+              <div>
+                <Text size="sm" c="dimmed">ИНН</Text>
+                <Text>{company.inn}</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">ОГРН</Text>
+                <Text>{company.ogrn ?? '—'}</Text>
+              </div>
+            </SimpleGrid>
             <div>
-              <Text size="sm" c="dimmed">ИНН</Text>
-              <Text>{registryData.inn}</Text>
+              <Text size="sm" c="dimmed">Вид деятельности (ОКВЭД)</Text>
+              <Text>{company.okved} {company.okvedName}</Text>
             </div>
             <div>
-              <Text size="sm" c="dimmed">ОГРН</Text>
-              <Text>{registryData.ogrn}</Text>
-            </div>
-            <div>
-              <Text size="sm" c="dimmed">Юридический адрес</Text>
-              <Text>{registryData.address}</Text>
-            </div>
-            <div>
-              <Text size="sm" c="dimmed">ОКВЭД</Text>
-              <Text>{registryData.okved}</Text>
+              <Text size="sm" c="dimmed">Адрес</Text>
+              <Text>{company.address ?? '—'}</Text>
             </div>
             <div>
               <Text size="sm" c="dimmed">Руководитель</Text>
-              <Text>{registryData.directorName}</Text>
+              <Text>{company.directorName ?? '—'}</Text>
             </div>
           </Stack>
-
-          <Group mt="xl" grow>
-            <Button variant="light" onClick={() => setManualMode(true)}>
-              Ввести вручную
-            </Button>
-            <Button onClick={handleUseRegistryData}>
-              Всё верно, использовать эти данные
-            </Button>
-          </Group>
+          <Text size="xs" c="dimmed" mt="lg">
+            Выручку и платежи по кредитам банк возьмёт из своих данных и кредитной истории — вводить их не нужно.
+          </Text>
         </Card>
       )}
 
-      {/* Ручной ввод */}
-      {manualMode && (
-        <Paper shadow="sm" p="xl" radius="md" withBorder mb={40}>
-          <Title order={4} mb="md">
-            Введите данные компании вручную
-          </Title>
-          <Stack>
-            <TextInput
-              label="ИНН"
-              value={formData.inn}
-              onChange={(e) => setFormData({ ...formData, inn: e.target.value })}
-              required
-            />
-            <Select
-              label="Тип компании"
-              data={[
-                { value: 'LLC', label: 'ООО' },
-                { value: 'IE', label: 'ИП' },
-              ]}
-              value={formData.type}
-              onChange={(value) => setFormData({ ...formData, type: value })}
-              required
-            />
-            <TextInput
-              label="Название компании"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-            <TextInput
-              label="ОГРН"
-              value={formData.ogrn}
-              onChange={(e) => setFormData({ ...formData, ogrn: e.target.value })}
-            />
-            <TextInput
-              label="ОКВЭД"
-              value={formData.okved}
-              onChange={(e) => setFormData({ ...formData, okved: e.target.value })}
-            />
-            <TextInput
-              label="Юридический адрес"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            />
-            <TextInput
-              label="Руководитель"
-              value={formData.directorName}
-              onChange={(e) => setFormData({ ...formData, directorName: e.target.value })}
-            />
-          </Stack>
-
-          <Group mt="xl" grow>
-            <Button variant="light" onClick={() => setManualMode(false)}>
-              Вернуться к поиску
-            </Button>
-            <Button onClick={handleManualSubmit}>
-              Далее → Финансы
-            </Button>
-          </Group>
-        </Paper>
-      )}
+      <Group>
+        <Button variant="outline" onClick={() => navigate('/client/product-select')}>
+          Назад
+        </Button>
+        <Button size="lg" color="red" style={{ flex: 1 }} disabled={!selected} onClick={handleContinue}>
+          Всё верно, продолжить
+        </Button>
+      </Group>
     </Container>
   );
 }

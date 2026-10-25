@@ -9,9 +9,28 @@ import {
   Divider,
   Stack,
   Alert,
+  SimpleGrid,
 } from '@mantine/core';
+import { IconClockHour4, IconFileCheck, IconMessageCircle } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { api, ApiError, saveSession } from '../../lib/apiClient';
 import { useApplicationStore } from '../../store/applicationStore';
+
+const DEMO_PASSWORD = 'Demo2026!';
+
+const DEMO_USERS = [
+  { email: 'igor@demo.ru', label: 'Игорь', hint: 'одобрение', color: 'blue' },
+  { email: 'olga@demo.ru', label: 'Ольга', hint: '3 компании', color: 'blue' },
+  { email: 'anna@demo.ru', label: 'Анна', hint: 'дозапрос', color: 'blue' },
+  { email: 'kozlov@demo.ru', label: 'Козлов', hint: 'отказ', color: 'blue' },
+  { email: 'analyst@demo.ru', label: 'Аналитик', hint: 'кабинет банка', color: 'green' },
+];
+
+const FEATURES = [
+  { icon: IconClockHour4, text: 'Решение за минуты — без визита в банк' },
+  { icon: IconMessageCircle, text: 'Каждый этап и решение объясняем простыми словами' },
+  { icon: IconFileCheck, text: 'Документы и подпись договора — прямо в кабинете' },
+];
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -19,20 +38,24 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
 
-const handleLogin = (role: 'CLIENT' | 'ANALYST') => {
-  resetStore();
-  setError(null);
-  
-  // Сохраняем тестовый токен
-  localStorage.setItem('auth_token', 'demo-token-' + role.toLowerCase());
-  
-  if (role === 'CLIENT') {
-    navigate('/client/product-select');
-  } else {
-    navigate('/analyst/dashboard');
-  }
-};
+  const login = async (loginEmail: string, loginPassword: string) => {
+    setError(null);
+    setLoading(loginEmail);
+    try {
+      const { token, user } = await api.login(loginEmail, loginPassword);
+      saveSession(token, user);
+      resetStore();
+      navigate(user.role === 'ANALYST' ? '/analyst/dashboard' : '/client/dashboard');
+    } catch (err) {
+      // Ошибки проверки полей приходят от API на английском — для входа достаточно общего текста
+      setError(err instanceof ApiError && err.code === 'VALIDATION_ERROR' ? 'Проверьте email и пароль' : (err as Error).message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       {/* Левая часть — фото */}
@@ -43,6 +66,7 @@ const handleLogin = (role: 'CLIENT' | 'ANALYST') => {
             linear-gradient(135deg, rgba(239, 49, 36, 0.85) 0%, rgba(201, 42, 42, 0.9) 100%),
             url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80')
           `,
+          backgroundColor: '#c92a2a',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           display: 'flex',
@@ -56,27 +80,17 @@ const handleLogin = (role: 'CLIENT' | 'ANALYST') => {
           Альфа-Кредит
         </Title>
         <Text size="xl" mb={40} style={{ opacity: 0.9, maxWidth: 500 }}>
-          Умный кредитный кабинет для бизнеса. Подберём лучшие условия за 5 минут.
+          Умный кредитный кабинет для бизнеса: подберём продукт под вашу задачу и покажем, что происходит с заявкой.
         </Text>
         <Stack gap="md">
-          <Group>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-              
-            </div>
-            <Text>Решение за 1 рабочий день</Text>
-          </Group>
-          <Group>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-              📊
-            </div>
-            <Text>Ставки от 14% годовых</Text>
-          </Group>
-          <Group>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-              
-            </div>
-            <Text>До 5 млрд ₽ на любые цели</Text>
-          </Group>
+          {FEATURES.map(({ icon: Icon, text }) => (
+            <Group key={text} wrap="nowrap">
+              <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={22} />
+              </div>
+              <Text>{text}</Text>
+            </Group>
+          ))}
         </Stack>
       </div>
 
@@ -100,41 +114,51 @@ const handleLogin = (role: 'CLIENT' | 'ANALYST') => {
           </Text>
 
           {error && (
-            <Alert color="red" mb="lg" onClose={() => setError(null)}>
+            <Alert color="red" mb="lg" onClose={() => setError(null)} withCloseButton>
               {error}
             </Alert>
           )}
 
-          <Stack gap="md">
-            <TextInput
-              label="Email"
-              placeholder="hello@alfa.ru"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <PasswordInput
-              label="Пароль"
-              placeholder="Ваш пароль"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <Button size="lg" color="red" fullWidth mt="md">
-              Войти
-            </Button>
-          </Stack>
+          <form onSubmit={(e) => { e.preventDefault(); login(email, password); }}>
+            <Stack gap="md">
+              <TextInput
+                label="Email"
+                placeholder="igor@demo.ru"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <PasswordInput
+                label="Пароль"
+                placeholder="Ваш пароль"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <Button type="submit" size="lg" color="red" fullWidth mt="md" loading={loading === email && !!email}>
+                Войти
+              </Button>
+            </Stack>
+          </form>
 
-          <Divider my="xl" label="Быстрый вход для демо" labelPosition="center" />
+          <Divider my="xl" label={`Быстрый вход для демо · пароль ${DEMO_PASSWORD}`} labelPosition="center" />
 
-          <Group grow>
-            <Button variant="light" color="blue" onClick={() => handleLogin('CLIENT')}>
-              Я Клиент
-            </Button>
-            <Button variant="light" color="green" onClick={() => handleLogin('ANALYST')}>
-              Я Аналитик
-            </Button>
-          </Group>
+          <SimpleGrid cols={2} spacing="xs">
+            {DEMO_USERS.map((u) => (
+              <Button
+                key={u.email}
+                variant="light"
+                color={u.color}
+                loading={loading === u.email}
+                onClick={() => login(u.email, DEMO_PASSWORD)}
+                styles={{ label: { flexDirection: 'column', lineHeight: 1.2 } }}
+                h={52}
+              >
+                <span>{u.label}</span>
+                <Text span size="xs" c="dimmed">{u.hint}</Text>
+              </Button>
+            ))}
+          </SimpleGrid>
         </div>
       </div>
     </div>

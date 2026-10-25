@@ -1,82 +1,130 @@
-// const API_BASE = 'http://localhost:3000/api/v1';
+import type {
+  AnalystCard, Application, ApplicationListItem, ApplicationStatus, Company, Contract, DocType,
+  DocumentMeta, DocumentsInfo, Explanation, Product, Purpose, QueueItem, Recommendation,
+  RegistryRecord, StatusHistoryEntry, User,
+} from './types';
+
+// В dev-режиме Vite проксирует /api в API, в Docker — nginx
 const API_BASE = '/api/v1';
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'auth_user';
 
-function getToken(): string | null {
-  return localStorage.getItem('auth_token');
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
 }
 
-function setToken(token: string) {
-  localStorage.setItem('auth_token', token);
+export function getUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
 }
 
-function clearToken() {
-  localStorage.removeItem('auth_token');
+export function saveSession(token: string, user: User) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: any,
-  requireAuth = false
-): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
 
-  if (requireAuth) {
-    const token = getToken();
-    if (!token) throw new Error('Не авторизован');
-    headers['Authorization'] = `Bearer ${token}`;
+/** Ошибка API в едином формате { code, message, details } */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly details?: string[];
+
+  constructor(status: number, code: string, message: string, details?: string[]) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let payload: BodyInit | undefined;
+  if (body instanceof FormData) {
+    payload = body;   // Content-Type с границей поставит браузер
+  } else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method, headers, body: payload });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Нет связи с сервером. Проверьте, что API запущен');
+  }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: 'Ошибка сервера' }));
-    throw new Error(error.message || `Ошибка ${res.status}`);
+    const err = await res.json().catch(() => ({}));
+    // Токен истёк или недействителен — на страницу входа
+    if (res.status === 401 && path !== '/auth/login') {
+      clearSession();
+      window.location.assign('/login');
+    }
+    throw new ApiError(res.status, err.code ?? 'ERROR', err.message ?? `Ошибка ${res.status}`, err.details);
   }
-
-  return res.json();
+  return (await res.json()) as T;
 }
 
-export const apiClient = {
-  auth: {
-    login: (email: string, password: string) =>
-      request<{ token: string; user: any }>('POST', '/auth/login', { email, password }),
-  },
-  me: () => request<any>('GET', '/me', undefined, true),
-  products: {
-    list: () => request<any[]>('GET', '/products'),
-    recommend: (data: any) =>
-      request<any>('POST', '/products/recommend', data, true),
-  },
-  registry: {
-    lookup: (inn: string) =>
-      request<any>('GET', `/registry/lookup?inn=${inn}`, undefined, true),
-  },
-  companies: {
-    create: (data: any) =>
-      request<any>('POST', '/companies', data, true),
-    updateFinancials: (companyId: string, data: any) =>
-      request<any>('PUT', `/companies/${companyId}/financials`, data, true),
-  },
-  applications: {
-    list: () => request<any[]>('GET', '/applications', undefined, true),
-    create: (data: any) =>
-      request<any>('POST', '/applications', data, true),
-    get: (id: string) =>
-      request<any>('GET', `/applications/${id}`, undefined, true),
-    update: (id: string, data: any) =>
-      request<any>('PATCH', `/applications/${id}`, data, true),
-    submit: (id: string, bkiConsent: boolean) =>
-      request<any>('POST', `/applications/${id}/submit`, { bkiConsent }, true),
-    timeline: (id: string) =>
-      request<any[]>('GET', `/applications/${id}/timeline`, undefined, true),
-  },
-};
+/** Файл с авторизацией: открываем через blob, обычная ссылка не передаст токен */
+async function openFile(path: string) {
+  const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+  if (!res.ok) throw new ApiError(res.status, 'ERROR', 'Не удалось открыть файл');
+  const url = URL.createObjectURL(await res.blob());
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
-export { getToken, setToken, clearToken };
+export const api = {
+  login: (email: string, password: string) =>
+    request<{ token: string; user: User }>('POST', '/auth/login', { email, password }),
+  me: () => request<{ user: User; companies: Company[] }>('GET', '/me'),
+
+  products: () => request<Product[]>('GET', '/products'),
+  recommend: (purpose: Purpose, amount: number, term: number) =>
+    request<Recommendation>('POST', '/products/recommend', { purpose, amount, term }),
+  registryLookup: (inn: string) =>
+    request<RegistryRecord>('GET', `/registry/lookup?inn=${encodeURIComponent(inn)}`),
+
+  applications: () => request<ApplicationListItem[]>('GET', '/applications'),
+  createApplication: (data: { companyId: string; productCode: string; purpose: Purpose; amount: number; term: number }) =>
+    request<Application>('POST', '/applications', data),
+  application: (id: string) => request<Application>('GET', `/applications/${id}`),
+  timeline: (id: string) => request<StatusHistoryEntry[]>('GET', `/applications/${id}/timeline`),
+  explanation: (id: string) => request<Explanation>('GET', `/applications/${id}/explanation`),
+  submit: (id: string) => request<Application>('POST', `/applications/${id}/submit`, { bkiConsent: true }),
+  cancel: (id: string) => request<Application>('POST', `/applications/${id}/cancel`),
+
+  documents: (id: string) => request<DocumentsInfo>('GET', `/applications/${id}/documents`),
+  uploadDocument: (id: string, docType: DocType, file: File) => {
+    const form = new FormData();
+    form.append('docType', docType);
+    form.append('file', file);
+    return request<{ document: DocumentMeta; missing: DocumentsInfo['missing'] }>('POST', `/applications/${id}/documents`, form);
+  },
+  openDocument: (id: string, docId: string) => openFile(`/applications/${id}/documents/${docId}`),
+
+  accept: (id: string, offerIndex: number) => request<Contract>('POST', `/applications/${id}/accept`, { offerIndex }),
+  contract: (id: string) => request<Contract>('GET', `/applications/${id}/contract`),
+  sign: (id: string, code: string) => request<Contract>('POST', `/applications/${id}/sign`, { code }),
+
+  analystQueue: (status: ApplicationStatus) =>
+    request<QueueItem[]>('GET', `/analyst/applications?status=${status}`),
+  analystCard: (id: string) => request<AnalystCard>('GET', `/analyst/applications/${id}`),
+  analystDecision: (id: string, body: { type: 'APPROVE' | 'COUNTER_OFFER' | 'REJECT'; comment: string; amount?: number; term?: number; rate?: number }) =>
+    request<Application>('POST', `/analyst/applications/${id}/decision`, body),
+  analystRequestInfo: (id: string, docType: DocType, comment: string) =>
+    request<Application>('POST', `/analyst/applications/${id}/request-info`, { docType, comment }),
+};
