@@ -52,9 +52,15 @@ pnpm licenses list --prod
 
 | Образ | Что это | Лицензия |
 |---|---|---|
-| node:24-alpine | среда выполнения API и заглушки | MIT (Node.js) |
+| node:24-alpine | среда выполнения API и заглушки, сборка кабинета | MIT (Node.js) |
 | postgres:16-alpine | база данных | PostgreSQL License |
 | nginx:stable-alpine | раздача фронтенда и прокси к API | BSD-2-Clause |
+
+## Изображения
+
+| Что | Источник | Лицензия |
+|---|---|---|
+| Фоновое фото на экране входа и в кабинете | Unsplash, загружается из интернета по ссылке `images.unsplash.com/photo-1486406146926-c627a92ad1ab`; без сети вместо него показывается однотонный фон | [Unsplash License](https://unsplash.com/license): бесплатное использование |
 
 ## Модели ИИ
 
