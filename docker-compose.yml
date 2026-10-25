@@ -1,17 +1,18 @@
+# Запуск всего проекта: docker compose up --build
+# Файл .env не обязателен — у всех переменных есть значения по умолчанию (после «:-»)
 services:
   postgres:
     image: postgres:16-alpine
-    env_file: .env
-    ports: ["5432:5432"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alfa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alfa}
+      POSTGRES_DB: ${POSTGRES_DB:-credit}
+    ports: ["55432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       retries: 10
-
-  redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
 
   mock-external:
     build: { context: ., dockerfile: apps/mock-external/Dockerfile }
@@ -19,12 +20,21 @@ services:
 
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
-    env_file: .env
+    environment:
+      # Внутри Docker сервисы видят друг друга по именам: postgres, mock-external
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alfa}:${POSTGRES_PASSWORD:-alfa}@postgres:5432/${POSTGRES_DB:-credit}
+      MOCK_EXTERNAL_URL: http://mock-external:4001
+      JWT_SECRET: ${JWT_SECRET:-demo-secret-change-me}
+      PIPELINE_STEP_MS: ${PIPELINE_STEP_MS:-1500}
     ports: ["3000:3000"]
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_started }
       mock-external: { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/v1/health || exit 1"]
+      interval: 5s
+      retries: 20
+      start_period: 10s
 
   web:
     build: { context: ., dockerfile: apps/web/Dockerfile }
