@@ -1,0 +1,11 @@
+# Не отправляем в Docker то, что собирается внутри или не должно попасть в образ
+**/node_modules
+**/dist
+**/.env
+**/.env.local
+**/*.log
+.git
+.github
+.idea
+.vscode
+docs

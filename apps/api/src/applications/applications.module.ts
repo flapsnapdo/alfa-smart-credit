@@ -8,6 +8,6 @@ import { PipelineService } from './pipeline.service';
   imports: [ExternalModule],
   controllers: [ApplicationsController],
   providers: [ApplicationsService, PipelineService],
-  exports: [ApplicationsService],
+  exports: [ApplicationsService, PipelineService],
 })
 export class ApplicationsModule {}

@@ -8,9 +8,10 @@ import { HealthController } from './health/health.controller';
 import { ProductsModule } from './products/products.module';
 import { RegistryModule } from './registry/registry.module';
 import { ContractsModule } from './contracts/contracts.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
-  imports: [DbModule, AuthModule, ProductsModule, RegistryModule, ApplicationsModule, ExplanationModule, AnalystModule, ContractsModule],
+  imports: [DbModule, AuthModule, ProductsModule, RegistryModule, ApplicationsModule, ExplanationModule, AnalystModule, ContractsModule, DocumentsModule],
   controllers: [HealthController],
 })
 export class AppModule {}

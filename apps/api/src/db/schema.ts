@@ -1,5 +1,5 @@
 import {
-  bigint, boolean, date, doublePrecision, index, integer, jsonb,
+  bigint, boolean, customType, date, doublePrecision, index, integer, jsonb,
   pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid,
 } from 'drizzle-orm/pg-core';
 import type { Factor, Grade, Offer, ScoringInput, StopFactor } from '@alfa/scoring';
@@ -19,11 +19,13 @@ export const applicationStatusEnum = pgEnum('application_status', [
 export const actorTypeEnum = pgEnum('actor_type', ['CLIENT', 'ANALYST', 'SYSTEM']);
 export const checkSourceEnum = pgEnum('check_source', ['REGISTRY', 'TAX', 'BKI']);
 export const decisionTypeEnum = pgEnum('decision_type', ['APPROVE', 'COUNTER_OFFER', 'MANUAL_REVIEW', 'REJECT']);
+export const docTypeEnum = pgEnum('doc_type', ['FINANCIAL_STATEMENTS', 'EQUIPMENT_INVOICE', 'OTHER']);
 
 export type Role = (typeof roleEnum.enumValues)[number];
 export type ApplicationStatus = (typeof applicationStatusEnum.enumValues)[number];
 export type ActorType = (typeof actorTypeEnum.enumValues)[number];
 export type CheckSource = (typeof checkSourceEnum.enumValues)[number];
+export type DocType = (typeof docTypeEnum.enumValues)[number];
 
 // Деньги — bigint в копейках; mode 'number' — в коде обычное число
 const money = (name: string) => bigint(name, { mode: 'number' });
@@ -170,3 +172,35 @@ export const contracts = pgTable('contracts', {
   issuedAt: timestamp('issued_at', { withTimezone: true }),
   createdAt: createdAt(),
 });
+
+// ── Документы и дозапрос ───────────────────────────────────────────
+
+// Байты файла. Для хакатона храним прямо в PostgreSQL: не нужен отдельный том в Docker и нет проблем с путями.
+// В настоящем банке это было бы объектное хранилище (S3), а в базе — только ссылка
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
+
+// Документы, которые загрузил клиент
+export const documents = pgTable('documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id').notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  docType: docTypeEnum('doc_type').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  content: bytea('content').notNull(),
+  uploadedBy: uuid('uploaded_by').notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index('documents_app_idx').on(t.applicationId)]);
+
+// Запросы документов: от системы (не хватает обязательного) или от аналитика.
+// Запрос закрыт, когда клиент загрузил документ этого типа (fulfilledAt)
+export const infoRequests = pgTable('info_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id').notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  docType: docTypeEnum('doc_type').notNull(),
+  comment: text('comment'),
+  actorType: actorTypeEnum('actor_type').notNull(),
+  actorId: uuid('actor_id'),
+  fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index('info_requests_app_idx').on(t.applicationId)]);
